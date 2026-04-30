@@ -1,0 +1,59 @@
+name: Publish marco-core to crates.io
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+-*"
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  publish:
+    name: Publish marco-core
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain (pinned)
+        uses: dtolnay/rust-toolchain@1.94.1
+
+      - name: Cache cargo
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-publish-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config libfontconfig-dev
+
+      - name: Show crate version
+        run: |
+          set -euo pipefail
+          crate_version="$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')"
+          echo "Publishing marco-core version: $crate_version (ref: ${GITHUB_REF_NAME:-manual})"
+
+      - name: Verify (test + clippy)
+        run: |
+          cargo test --locked
+          cargo clippy --all-targets --locked
+
+      - name: Package (dry-run check)
+        run: cargo publish --dry-run --locked
+
+      - name: Publish marco-core
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.MARCO_CORE_CRATE_IO }}
+        run: cargo publish --locked
