@@ -1,4 +1,4 @@
-// Marco Sliders Grammar (Marco_Extended)
+// Extended slide-deck grammar.
 //
 // Syntax:
 //
@@ -16,7 +16,7 @@
 // @slideend
 //
 // Notes:
-// - Sliders are a Marco extension inspired by VuePress revealjs slide syntax.
+// - Slide decks use extended syntax inspired by VuePress revealjs slide syntax.
 // - Slide separators are:
 //   - `---` for a new horizontal slide
 //   - `--` for a new vertical slide (currently preserved as metadata only)
@@ -33,18 +33,24 @@ use nom::{
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+/// A single slide payload captured by the slider grammar.
 pub struct MarcoSlide<'a> {
+    /// Raw markdown span of the slide body.
     pub content: Span<'a>,
+    /// Whether this slide originated from a vertical separator (`--`).
     pub vertical: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+/// Parsed extended slide-deck container.
 pub struct MarcoSlideDeck<'a> {
+    /// Optional auto-advance timer in seconds.
     pub timer_seconds: Option<u32>,
+    /// Parsed slide sequence.
     pub slides: Vec<MarcoSlide<'a>>,
 }
 
-/// Parse a Marco `@slidestart ... @slideend` slide deck.
+/// Parse an extended `@slidestart ... @slideend` slide deck.
 ///
 /// This is a block-level parser that captures raw slide body spans; the parser
 /// layer is responsible for recursively parsing each slide's markdown content.

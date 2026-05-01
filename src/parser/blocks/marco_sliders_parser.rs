@@ -1,6 +1,6 @@
-//! Marco sliders parser - converts grammar output to AST nodes
+//! Extended slide-deck parser - converts grammar output to AST nodes.
 //!
-//! Converts `grammar::blocks::marco_sliders::MarcoSlideDeck` into:
+//! Converts the grammar-level slide deck into:
 //! - `NodeKind::SliderDeck { timer_seconds }`
 //! - `NodeKind::Slide { vertical }`
 //!
@@ -10,7 +10,7 @@ use super::shared::{to_parser_span, to_parser_span_range, GrammarSpan};
 use crate::grammar::blocks::marco_sliders::MarcoSlideDeck;
 use crate::parser::ast::{Document, Node, NodeKind};
 
-/// Parse a Marco slide deck into an AST node.
+/// Parse an extended slide deck into an AST node.
 ///
 /// # Arguments
 /// * `deck` - Grammar output for the full slide deck

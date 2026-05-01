@@ -1,6 +1,6 @@
-//! Marco extended tab blocks parser - converts grammar output to AST nodes
+//! Extended tab-block parser - converts grammar output to AST nodes.
 //!
-//! Converts `grammar::blocks::marco_tab_blocks::MarcoTabBlock` into:
+//! Converts the grammar-level tab block into:
 //! - `NodeKind::TabGroup`
 //! - `NodeKind::TabItem { title }`
 //!
@@ -10,7 +10,7 @@ use super::shared::{to_parser_span, to_parser_span_range, GrammarSpan};
 use crate::grammar::blocks::marco_tab_blocks::MarcoTabBlock;
 use crate::parser::ast::{Document, Node, NodeKind};
 
-/// Parse a Marco tab block into an AST node.
+/// Parse an extended tab block into an AST node.
 ///
 /// # Arguments
 /// * `block` - Grammar output for the full tab container

@@ -1,4 +1,4 @@
-// Marco Extended Tab Blocks Grammar
+// Extended tab-block grammar.
 //
 // Syntax:
 //
@@ -11,7 +11,7 @@
 // :::
 //
 // Notes:
-// - Tab blocks are a Marco extension.
+// - Tab blocks use extended syntax.
 // - `@tab` and the closing `:::` are only recognized at the top-level within the
 //   container (not inside fenced code blocks).
 // - Up to 3 leading spaces are allowed before markers, similar to CommonMark.
@@ -26,17 +26,22 @@ use nom::{
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+/// A single tab item captured by the tab-block grammar.
 pub struct MarcoTabItem<'a> {
+    /// Tab header title.
     pub title: String,
+    /// Raw markdown span for this tab panel body.
     pub content: Span<'a>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+/// Parsed extended tab container with one or more items.
 pub struct MarcoTabBlock<'a> {
+    /// Parsed tab items in source order.
     pub items: Vec<MarcoTabItem<'a>>,
 }
 
-/// Parse a Marco `:::tab` container block.
+/// Parse an extended `:::tab` container block.
 ///
 /// This is a block-level parser that captures raw panel text spans; the parser
 /// layer is responsible for recursively parsing each panel's markdown content.
