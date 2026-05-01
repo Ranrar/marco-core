@@ -41,7 +41,7 @@ You are a Rust developer working on `marco-core`, a **pure-Rust library** crate 
 - **Integration tests** live in `tests/*.rs` and exercise only the public API re-exported from `src/lib.rs`.
 - A new grammar rule needs both: a unit test in the grammar module + an integration test in `tests/`.
 - A bug fix needs a regression test that fails before the fix and passes after.
-- The CommonMark spec suite lives in `tests/commonmark_spec_conformance.rs` and loads `tests/spec/*.json`. Bump `MIN_COMMONMARK_PASS` upward when conformance improves; never lower it without a documented reason. Set `MARCO_SPEC_VERBOSE=1` to print failures, `MARCO_SPEC_STRICT=1` to require 100% pass.
+- The CommonMark spec suite lives in `tests/commonmark_spec_it.rs` and loads `tools/spec/*.json`. Bump `MIN_COMMONMARK_PASS` upward when conformance improves; never lower it without a documented reason. Set `MARCO_SPEC_VERBOSE=1` to print failures, `MARCO_SPEC_STRICT=1` to require 100% pass.
 
 ## When to refuse
 

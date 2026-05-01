@@ -87,10 +87,10 @@ grammar/parser features:
   after.
 - Run the CommonMark spec suite locally:
   ```bash
-  MARCO_SPEC_VERBOSE=1 cargo test --test commonmark_spec_conformance
+  MARCO_SPEC_VERBOSE=1 cargo test --test commonmark_spec_it
   ```
   If your change improves conformance, bump `MIN_COMMONMARK_PASS` in
-  `tests/commonmark_spec_conformance.rs` to the new measured baseline.
+  `tests/commonmark_spec_it.rs` to the new measured baseline.
 
 ## Public API & semver
 
