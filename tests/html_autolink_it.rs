@@ -57,7 +57,7 @@ fn test_html_span_not_autolink() {
 }
 
 #[test]
-fn test_valid_autolink_url() {
+fn test_autolink_url_parses_as_link() {
     let input = "Visit <https://example.com> for info.";
     let doc = parse(input).expect("Parse failed");
 
@@ -79,7 +79,7 @@ fn test_valid_autolink_url() {
 }
 
 #[test]
-fn test_valid_autolink_email() {
+fn test_autolink_email_parses_as_link() {
     let input = "Contact <user@example.com> today.";
     let doc = parse(input).expect("Parse failed");
 
@@ -115,7 +115,7 @@ fn test_html_div_not_autolink() {
 }
 
 #[test]
-fn test_invalid_autolink_no_colon() {
+fn test_autolink_without_colon_remains_text() {
     let input = "Not an autolink: <notaurl>";
     let doc = parse(input).expect("Parse failed");
 
@@ -175,7 +175,7 @@ fn test_highlighting_html_vs_autolink() {
 }
 
 #[test]
-fn test_mixed_html_and_autolinks() {
+fn test_html_and_autolinks_parse_without_conflict() {
     let input = r#"Text <img src="icon.png" /> and link <https://example.com> end."#;
     let doc = parse(input).expect("Parse failed");
 

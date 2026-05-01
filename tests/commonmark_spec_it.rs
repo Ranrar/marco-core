@@ -1,20 +1,23 @@
 //! CommonMark spec conformance.
 //!
-//! Loads the official CommonMark spec examples (and a small set of
-//! Marco-specific extras) from JSON fixtures and asserts that
+//! Loads the official CommonMark spec examples (and extension fixture suites)
+//! from JSON fixtures and asserts that
 //! `marco_core::parse` + `marco_core::render` produce the expected HTML.
 //!
-//! The fixtures live in `tests/spec/`:
+//! The fixtures live in `tools/spec/`:
 //! - `commonmark.json` — 652 examples from the CommonMark 0.30 test suite.
-//! - `extra.json`      — Marco-specific cases beyond the spec.
+//! - `diagram.json`    — Mermaid/diagram extension cases.
+//! - `gfm.json`        — GFM extension cases.
+//! - `marco.json`      — Marco-specific extension cases.
+//! - `math.json`       — Math extension cases.
 //!
 //! ## Strict mode
 //!
 //! By default the test asserts a **minimum pass rate** (regression guard)
 //! rather than 100% conformance, because individual rendering differences
 //! (whitespace, attribute ordering, entity escaping) can drift over time.
-//! The minimum is configured by [`MIN_COMMONMARK_PASS`] / [`MIN_EXTRA_PASS`]
-//! and reflects the current measured baseline.
+//! The minimum is configured by [`MIN_COMMONMARK_PASS`] and reflects the
+//! current measured baseline.
 //!
 //! Set `MARCO_SPEC_STRICT=1` to require 100% pass.
 //! Set `MARCO_SPEC_VERBOSE=1` to print the first failures to stderr.
@@ -39,10 +42,6 @@ use serde::Deserialize;
 /// strict HTML comparison. Bump upward as conformance improves; never lower
 /// without a documented reason. Current measured baseline: 285.
 const MIN_COMMONMARK_PASS: usize = 280;
-
-/// Minimum number of Marco-extra examples that must pass strict HTML
-/// comparison. Current measured baseline: 4.
-const MIN_EXTRA_PASS: usize = 4;
 
 #[derive(Debug, Deserialize)]
 struct RawEntry {
@@ -159,8 +158,8 @@ fn run_suite(cases: &[SpecCase]) -> Report {
 }
 
 #[test]
-fn commonmark_spec_conformance() {
-    let json = include_str!("spec/commonmark.json");
+fn test_commonmark_spec_matches_expected_html() {
+    let json = include_str!("../tools/spec/commonmark.json");
     let cases = load_cases(json);
     assert!(
         cases.len() >= 600,
@@ -202,44 +201,36 @@ fn commonmark_spec_conformance() {
 }
 
 #[test]
-fn marco_extra_conformance() {
-    let json = include_str!("spec/extra.json");
-    let cases = load_cases(json);
+fn test_extension_fixtures_match_expected_html() {
+    let suites = [
+        ("diagram", include_str!("../tools/spec/diagram.json")),
+        ("gfm", include_str!("../tools/spec/gfm.json")),
+        ("marco", include_str!("../tools/spec/marco.json")),
+        ("math", include_str!("../tools/spec/math.json")),
+    ];
 
-    if cases.is_empty() {
-        eprintln!("extra.json contains no examples; skipping");
-        return;
-    }
+    for (name, json) in suites {
+        let cases = load_cases(json);
+        assert!(!cases.is_empty(), "{name} fixture suite is empty");
 
-    let report = run_suite(&cases);
-    let pct = report.passed as f64 / report.total as f64 * 100.0;
-    eprintln!(
-        "Marco extras: {}/{} passed ({:.1}%)",
-        report.passed, report.total, pct
-    );
-    if !report.failures.is_empty() {
-        eprintln!("--- failures ---");
-        for f in &report.failures {
-            eprintln!("{f}\n");
+        let report = run_suite(&cases);
+        let pct = report.passed as f64 / report.total as f64 * 100.0;
+        eprintln!(
+            "{name} fixtures: {}/{} passed ({:.1}%)",
+            report.passed, report.total, pct
+        );
+        if !report.failures.is_empty() {
+            eprintln!("--- {name} failures ---");
+            for f in &report.failures {
+                eprintln!("{f}\n");
+            }
         }
-    }
 
-    let strict = std::env::var("MARCO_SPEC_STRICT").is_ok();
-    if strict {
         assert_eq!(
-            report.passed,
-            report.total,
-            "MARCO_SPEC_STRICT=1: {} of {} extra examples failed",
+            report.passed, report.total,
+            "{name}: {} of {} examples failed",
             report.total - report.passed,
             report.total
-        );
-    } else {
-        assert!(
-            report.passed >= MIN_EXTRA_PASS,
-            "regression: only {} of {} extra examples passed (baseline {})",
-            report.passed,
-            report.total,
-            MIN_EXTRA_PASS
         );
     }
 }
@@ -307,8 +298,8 @@ fn run_structural_suite(cases: &[SpecCase]) -> Report {
 }
 
 #[test]
-fn commonmark_spec_structural() {
-    let json = include_str!("spec/commonmark.json");
+fn test_commonmark_spec_matches_structural_signature() {
+    let json = include_str!("../tools/spec/commonmark.json");
     let cases = load_cases(json);
 
     let report = run_structural_suite(&cases);

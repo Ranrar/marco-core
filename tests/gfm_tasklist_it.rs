@@ -33,7 +33,7 @@ fn test_gfm_task_list_renders_svg_checkbox_icons() {
 
     assert!(html.contains("marco-task-icon"), "expected svg icon class");
     assert!(
-        html.contains("task-list-item-checkbox"),
+        html.contains("marco-marco-task-checkbox"),
         "expected checkbox span class"
     );
     assert!(

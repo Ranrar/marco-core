@@ -25,7 +25,7 @@ fn http_prefixed(url_without_scheme: &str) -> String {
 }
 
 #[test]
-fn test_gfm_www_autolink_basic() {
+fn test_gfm_www_autolink_parses_as_link() {
     let md = "www.commonmark.org\n";
     let doc = marco_core::parser::parse(md).expect("parse failed");
 
@@ -39,7 +39,7 @@ fn test_gfm_www_autolink_basic() {
 }
 
 #[test]
-fn test_gfm_www_autolink_with_path_and_trailing_period() {
+fn test_gfm_www_autolink_parses_path_and_trims_trailing_period() {
     let md = "Visit www.commonmark.org/help for more information.\n";
     let doc = marco_core::parser::parse(md).expect("parse failed");
 
@@ -63,7 +63,7 @@ fn test_gfm_www_autolink_with_path_and_trailing_period() {
 }
 
 #[test]
-fn test_gfm_autolink_parentheses_balancing() {
+fn test_gfm_autolink_balances_parentheses_in_url() {
     let md = "www.google.com/search?q=Markup+(business)))\n";
     let doc = marco_core::parser::parse(md).expect("parse failed");
 
@@ -103,7 +103,7 @@ fn test_gfm_autolink_entity_suffix_trimmed() {
 }
 
 #[test]
-fn test_gfm_email_autolink_and_plus_rules() {
+fn test_gfm_email_autolink_accepts_plus_addressing() {
     let md = "hello@mail+xyz.example isn't valid, but hello+xyz@mail.example is.\n";
     let doc = marco_core::parser::parse(md).expect("parse failed");
 

@@ -2,7 +2,7 @@ use marco_core::parser::parse;
 use marco_core::render::RenderOptions;
 
 #[test]
-fn integration_test_gfm_footnotes_basic_rendering() {
+fn test_gfm_footnotes_basic_rendering() {
     let input = "Here is a footnote reference[^1].\n\n[^1]: Footnote definition.\n";
     let doc = parse(input).expect("parse failed");
     let options = RenderOptions::default();
@@ -21,7 +21,7 @@ fn integration_test_gfm_footnotes_basic_rendering() {
 }
 
 #[test]
-fn integration_test_gfm_footnotes_missing_definition_falls_back_to_literal() {
+fn test_gfm_footnotes_missing_definition_falls_back_to_literal() {
     let input = "Missing def[^missing].\n";
     let doc = parse(input).expect("parse failed");
     let options = RenderOptions::default();
@@ -33,7 +33,7 @@ fn integration_test_gfm_footnotes_missing_definition_falls_back_to_literal() {
 }
 
 #[test]
-fn integration_test_gfm_footnotes_multiline_definition() {
+fn test_gfm_footnotes_multiline_definition() {
     let input =
         "A multi-line footnote[^multi].\n\n[^multi]: First line\n    second line\n    third line\n";
     let doc = parse(input).expect("parse failed");

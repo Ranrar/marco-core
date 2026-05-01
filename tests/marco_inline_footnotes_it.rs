@@ -2,7 +2,7 @@ use marco_core::parser::parse;
 use marco_core::render::RenderOptions;
 
 #[test]
-fn integration_test_inline_footnote_basic_rendering() {
+fn test_inline_footnote_basic_rendering() {
     let input = "Inline note.^[This is it]\n";
     let doc = parse(input).expect("parse failed");
     let options = RenderOptions::default();
@@ -20,7 +20,7 @@ fn integration_test_inline_footnote_basic_rendering() {
 }
 
 #[test]
-fn integration_test_inline_footnote_supports_inline_markup() {
+fn test_inline_footnote_supports_inline_markup() {
     let input = "Complex^[*italic* and **bold** and `code`]\n";
     let doc = parse(input).expect("parse failed");
     let options = RenderOptions::default();
@@ -33,7 +33,7 @@ fn integration_test_inline_footnote_supports_inline_markup() {
 }
 
 #[test]
-fn integration_test_inline_footnote_not_parsed_inside_code_span() {
+fn test_inline_footnote_not_parsed_inside_code_span() {
     let input = "`^[not a footnote]`\n";
     let doc = parse(input).expect("parse failed");
     let options = RenderOptions::default();
@@ -44,7 +44,7 @@ fn integration_test_inline_footnote_not_parsed_inside_code_span() {
 }
 
 #[test]
-fn integration_test_inline_footnote_does_not_break_superscript() {
+fn test_inline_footnote_does_not_break_superscript() {
     let input = "^hi^ and a note^[x]\n";
     let doc = parse(input).expect("parse failed");
     let options = RenderOptions::default();

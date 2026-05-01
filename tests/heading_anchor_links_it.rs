@@ -2,7 +2,7 @@ use marco_core::parser::parse;
 use marco_core::render::RenderOptions;
 
 #[test]
-fn integration_test_heading_with_id_renders_anchor_link_with_svg() {
+fn test_heading_with_id_renders_anchor_link_with_svg() {
     let input = "## Title {#custom-id}\n";
     let doc = parse(input).expect("parse failed");
 
@@ -18,7 +18,7 @@ fn integration_test_heading_with_id_renders_anchor_link_with_svg() {
 }
 
 #[test]
-fn integration_test_heading_without_id_renders_auto_slug_anchor() {
+fn test_heading_without_id_renders_auto_slug_anchor() {
     let input = "## Title\n";
     let doc = parse(input).expect("parse failed");
 

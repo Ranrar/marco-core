@@ -1,7 +1,7 @@
 use marco_core::{parse, render, RenderOptions};
 
 #[test]
-fn entity_references_render_as_decoded_text() {
+fn test_entity_references_render_decoded_text() {
     let input = "&copy; &amp; &#169; &#xA9;";
     let doc = parse(input).expect("parse failed");
 
@@ -10,7 +10,7 @@ fn entity_references_render_as_decoded_text() {
 }
 
 #[test]
-fn reference_style_link_full_resolves_forward_definition() {
+fn test_reference_link_full_resolves_forward_definition() {
     let input = "[foo][bar]\n\n[bar]: https://example.com \"Title\"";
     let doc = parse(input).expect("parse failed");
 
@@ -22,7 +22,7 @@ fn reference_style_link_full_resolves_forward_definition() {
 }
 
 #[test]
-fn reference_style_link_shortcut_resolves() {
+fn test_reference_link_shortcut_resolves() {
     let input = "[bar]\n\n[bar]: https://example.com";
     let doc = parse(input).expect("parse failed");
 
@@ -31,7 +31,7 @@ fn reference_style_link_shortcut_resolves() {
 }
 
 #[test]
-fn reference_style_link_collapsed_resolves() {
+fn test_reference_link_collapsed_resolves() {
     let input = "[bar][]\n\n[bar]: https://example.com";
     let doc = parse(input).expect("parse failed");
 
@@ -40,7 +40,7 @@ fn reference_style_link_collapsed_resolves() {
 }
 
 #[test]
-fn reference_style_link_unresolved_renders_literally() {
+fn test_reference_link_unresolved_renders_literal() {
     let input = "See [missing][ref].";
     let doc = parse(input).expect("parse failed");
 
@@ -49,7 +49,7 @@ fn reference_style_link_unresolved_renders_literally() {
 }
 
 #[test]
-fn reference_style_link_duplicate_definitions_first_wins() {
+fn test_reference_link_duplicate_definitions_first_wins() {
     let input = "[foo]\n\n[foo]: https://first.example\n[foo]: https://second.example\n";
     let doc = parse(input).expect("parse failed");
 
@@ -58,7 +58,7 @@ fn reference_style_link_duplicate_definitions_first_wins() {
 }
 
 #[test]
-fn reference_style_link_unicode_casefold_sharp_s_resolves() {
+fn test_reference_link_unicode_casefold_sharp_s_resolves() {
     let input = "[ẞ]\n\n[SS]: /url\n";
     let doc = parse(input).expect("parse failed");
 
@@ -67,7 +67,7 @@ fn reference_style_link_unicode_casefold_sharp_s_resolves() {
 }
 
 #[test]
-fn reference_style_link_escaped_bracket_label_resolves() {
+fn test_reference_link_escaped_bracket_label_resolves() {
     let input = "[foo][ref\\[]\n\n[ref\\[]: /uri\n";
     let doc = parse(input).expect("parse failed");
 
@@ -76,7 +76,7 @@ fn reference_style_link_escaped_bracket_label_resolves() {
 }
 
 #[test]
-fn reference_style_link_escaped_label_does_not_match_unescaped_definition() {
+fn test_reference_link_escaped_label_not_match_unescaped_definition() {
     let input = "[bar][foo\\!]\n\n[foo!]: /url\n";
     let doc = parse(input).expect("parse failed");
 

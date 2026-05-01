@@ -1,5 +1,5 @@
 #[test]
-fn integration_test_single_line_html_block_does_not_swallow_following_markdown() {
+fn test_single_line_html_block_does_not_swallow_following_markdown() {
     // Regression for editor UX: a single-line <div>...</div> should not turn the
     // rest of the document into a raw HTML block.
     let md = "<div>html</div>\n`www.example.com`\nwww.example.com inside code: `www.example.com`\n";

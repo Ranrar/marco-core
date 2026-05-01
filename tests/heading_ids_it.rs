@@ -2,7 +2,7 @@ use marco_core::parser::{parse, NodeKind};
 use marco_core::render::RenderOptions;
 
 #[test]
-fn integration_test_extended_heading_ids_render_id_attribute() {
+fn test_extended_heading_ids_render_id_attribute() {
     let input = "### Title {#custom-id}\n\n## Another title {#another-id}\n";
     let doc = parse(input).expect("parse failed");
 
@@ -31,7 +31,7 @@ fn integration_test_extended_heading_ids_render_id_attribute() {
 }
 
 #[test]
-fn integration_test_extended_heading_ids_invalid_syntax_is_left_in_text() {
+fn test_extended_heading_ids_invalid_syntax_is_left_in_text() {
     let input = "### Space before id { #bad }\n\n### Title {#id} trailing text\n";
     let doc = parse(input).expect("parse failed");
 

@@ -4,7 +4,7 @@
 use marco_core::{parse_to_html, parse_to_html_cached, ParserCache, RenderOptions};
 
 #[test]
-fn parser_cache_returns_same_html_on_repeated_render() {
+fn test_parser_cache_returns_same_html_for_repeated_input() {
     let cache = ParserCache::new();
     let md = "# Hello\n\nA *cached* paragraph.\n";
 
@@ -21,7 +21,7 @@ fn parser_cache_returns_same_html_on_repeated_render() {
 }
 
 #[test]
-fn parser_cache_records_entries_after_use() {
+fn test_parser_cache_records_entries_after_calls() {
     let cache = ParserCache::new();
     let before = cache.stats();
     assert_eq!(before.ast_entries, 0);
@@ -43,7 +43,7 @@ fn parser_cache_records_entries_after_use() {
 }
 
 #[test]
-fn parse_to_html_uncached_matches_cached_output() {
+fn test_parse_to_html_uncached_matches_cached() {
     let md = "## Title\n\n- a\n- b\n";
 
     let uncached = parse_to_html(md, RenderOptions::default()).expect("uncached failed");

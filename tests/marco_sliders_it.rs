@@ -14,7 +14,7 @@ fn count_kind_in_document(document: &Document, kind: fn(&NodeKind) -> bool) -> u
 }
 
 #[test]
-fn test_sliders_parse_to_ast() {
+fn test_sliders_parse_builds_ast() {
     let input = "@slidestart:t5\n# One\n---\nTwo\n--\nThree\n@slideend\n";
 
     let doc = parse(input).expect("parse failed");
@@ -57,7 +57,7 @@ fn test_sliders_parse_to_ast() {
 }
 
 #[test]
-fn test_sliders_render_to_expected_html_skeleton() {
+fn test_sliders_render_matches_html_skeleton() {
     let input = "@slidestart:t5\nOne\n---\nTwo\n---\nThree\n@slideend\n";
 
     let doc = parse(input).expect("parse failed");
@@ -76,7 +76,7 @@ fn test_sliders_render_to_expected_html_skeleton() {
 }
 
 #[test]
-fn test_nested_sliders_do_not_create_nested_decks() {
+fn test_sliders_nested_markers_do_not_create_nested_decks() {
     let input = "@slidestart\nOuter\n\n@slidestart:t1\nInner\n@slideend\n\n@slideend\n";
 
     let doc = parse(input).expect("parse failed");

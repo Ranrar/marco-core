@@ -1,0 +1,40 @@
+[
+  {
+    "_comment": "GFM extension fixtures",
+    "_description": "Tables, strikethrough, autolinks, and footnotes",
+    "_usage": "Run with: cargo test --test extension_spec_conformance",
+    "_note": "Comment entries are ignored by the fixture loader"
+  },
+  {
+    "markdown": "| A | B |\n|:--|--:|\n| 1 | 2 |\n",
+    "html": "<table>\n<thead>\n<tr><th style=\"text-align: left;\">A</th><th style=\"text-align: right;\">B</th></tr>\n</thead>\n<tbody>\n<tr><td style=\"text-align: left;\">1</td><td style=\"text-align: right;\">2</td></tr>\n</tbody>\n</table>\n",
+    "example": 3101,
+    "start_line": 1,
+    "end_line": 3,
+    "section": "GFM table alignment"
+  },
+  {
+    "markdown": "~~gone~~\n",
+    "html": "<p><del>gone</del></p>\n",
+    "example": 3102,
+    "start_line": 5,
+    "end_line": 5,
+    "section": "GFM strikethrough"
+  },
+  {
+    "markdown": "https://example.com/path?q=1\n",
+    "html": "<p><a href=\"https://example.com/path?q=1\">https://example.com/path?q=1</a></p>\n",
+    "example": 3103,
+    "start_line": 7,
+    "end_line": 7,
+    "section": "GFM autolink literal"
+  },
+  {
+    "markdown": "Text[^1]\n\n[^1]: Note\n",
+    "html": "<p>Text<sup class=\"footnote-ref\"><a href=\"#fn1\" id=\"fnref1\">1</a></sup></p>\n<section class=\"footnotes\">\n<ol>\n<li id=\"fn1\"><p>Note</p>\n</li>\n</ol>\n</section>\n",
+    "example": 3104,
+    "start_line": 9,
+    "end_line": 11,
+    "section": "GFM footnote block"
+  }
+]

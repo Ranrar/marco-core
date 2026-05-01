@@ -5,14 +5,14 @@
 use marco_core::{sanitize_input, sanitize_input_with_stats, InputSource};
 
 #[test]
-fn sanitize_input_passes_clean_utf8_through() {
+fn test_sanitize_input_preserves_clean_utf_8() {
     let input = "Hello, world!\n";
     let out = sanitize_input(input.as_bytes(), InputSource::Keyboard);
     assert_eq!(out, input);
 }
 
 #[test]
-fn sanitize_input_strips_null_bytes() {
+fn test_sanitize_input_strips_null_bytes() {
     let input = b"abc\0def";
     let out = sanitize_input(input, InputSource::File);
     assert!(!out.contains('\0'), "null bytes must be removed: {out:?}");
@@ -21,7 +21,7 @@ fn sanitize_input_strips_null_bytes() {
 }
 
 #[test]
-fn sanitize_input_replaces_invalid_utf8() {
+fn test_sanitize_input_replaces_invalid_utf_8() {
     // 0xFF on its own is not valid UTF-8.
     let input = b"good\xFFbad";
     let out = sanitize_input(input, InputSource::Network);
@@ -33,7 +33,7 @@ fn sanitize_input_replaces_invalid_utf8() {
 }
 
 #[test]
-fn sanitize_input_with_stats_reports_byte_counts() {
+fn test_sanitize_input_with_stats_reports_counts() {
     let input = b"hello\0world";
     let (out, stats) = sanitize_input_with_stats(input, InputSource::Clipboard);
 

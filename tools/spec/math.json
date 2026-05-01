@@ -1,0 +1,40 @@
+[
+  {
+    "_comment": "Math extension fixtures",
+    "_description": "Inline/display math rendering and delimiter edge cases",
+    "_usage": "Run with: cargo test --test extension_spec_conformance",
+    "_note": "Comment entries are ignored by the fixture loader"
+  },
+  {
+    "markdown": "Inline $\\frac{a}{ $ test\n",
+    "html": "<p>Inline <code class=\"math-error\" title=\"Failed to render math\">\\frac{a}{ </code> test</p>\n",
+    "example": 3301,
+    "start_line": 1,
+    "end_line": 1,
+    "section": "Inline math invalid latex fallback"
+  },
+  {
+    "markdown": "```math\n\\frac{a}{\n```\n",
+    "html": "<pre class=\"math-error\" title=\"Failed to render math\">\\frac{a}{</pre>",
+    "example": 3302,
+    "start_line": 3,
+    "end_line": 5,
+    "section": "Fenced math invalid latex fallback"
+  },
+  {
+    "markdown": "$$x^2 + y^2 = z^2\n",
+    "html": "<p>$$x<sup>2 + y</sup>2 = z^2</p>\n",
+    "example": 3303,
+    "start_line": 7,
+    "end_line": 7,
+    "section": "Unclosed display delimiter edge case"
+  },
+  {
+    "markdown": "Price is \\$5 only\n",
+    "html": "<p>Price is $5 only</p>\n",
+    "example": 3304,
+    "start_line": 9,
+    "end_line": 9,
+    "section": "Escaped dollar is literal text"
+  }
+]

@@ -1,0 +1,40 @@
+[
+  {
+    "_comment": "Marco extension fixtures",
+    "_description": "Marco tab blocks, headerless tables, and inline footnotes",
+    "_usage": "Run with: cargo test --test extension_spec_conformance",
+    "_note": "Comment entries are ignored by the fixture loader"
+  },
+  {
+    "markdown": ":::tab\n@tab A\nHello\n\n@tab B\nWorld\n\n:::\n",
+    "html": "<div class=\"marco-tabs\">\n<input class=\"marco-tabs__radio\" type=\"radio\" name=\"marco-tabs-0\" id=\"marco-tabs-0-0\" aria-label=\"A\" checked />\n<input class=\"marco-tabs__radio\" type=\"radio\" name=\"marco-tabs-0\" id=\"marco-tabs-0-1\" aria-label=\"B\" />\n<div class=\"marco-tabs__tablist\">\n<label class=\"marco-tabs__tab\" for=\"marco-tabs-0-0\">A</label>\n<label class=\"marco-tabs__tab\" for=\"marco-tabs-0-1\">B</label>\n</div>\n<div class=\"marco-tabs__panels\">\n<div class=\"marco-tabs__panel\">\n<p>Hello</p>\n</div>\n<div class=\"marco-tabs__panel\">\n<p>World</p>\n</div>\n</div>\n</div>\n",
+    "example": 3201,
+    "start_line": 1,
+    "end_line": 8,
+    "section": "Marco tab block render"
+  },
+  {
+    "markdown": "|---|---|\n| a | b |\n| c | d |\n",
+    "html": "<table>\n<tbody>\n<tr><td>a</td><td>b</td></tr>\n<tr><td>c</td><td>d</td></tr>\n</tbody>\n</table>\n",
+    "example": 3202,
+    "start_line": 10,
+    "end_line": 12,
+    "section": "Marco headerless table"
+  },
+  {
+    "markdown": "Inline ^[note]\n",
+    "html": "<p>Inline <sup class=\"footnote-ref\"><a href=\"#fn1\" id=\"fnref1\">1</a></sup></p>\n<section class=\"footnotes\">\n<ol>\n<li id=\"fn1\"><p>note</p>\n</li>\n</ol>\n</section>\n",
+    "example": 3203,
+    "start_line": 14,
+    "end_line": 14,
+    "section": "Marco inline footnote"
+  },
+  {
+    "markdown": ":::tab\n@tab Outer\n\n:::tab\n@tab Inner\nInner\n\n:::\n\n:::\n",
+    "html": "<div class=\"marco-tabs\">\n<input class=\"marco-tabs__radio\" type=\"radio\" name=\"marco-tabs-0\" id=\"marco-tabs-0-0\" aria-label=\"Outer\" checked />\n<input class=\"marco-tabs__radio\" type=\"radio\" name=\"marco-tabs-0\" id=\"marco-tabs-0-1\" aria-label=\"Inner\" />\n<div class=\"marco-tabs__tablist\">\n<label class=\"marco-tabs__tab\" for=\"marco-tabs-0-0\">Outer</label>\n<label class=\"marco-tabs__tab\" for=\"marco-tabs-0-1\">Inner</label>\n</div>\n<div class=\"marco-tabs__panels\">\n<div class=\"marco-tabs__panel\">\n<p>:::tab</p>\n</div>\n<div class=\"marco-tabs__panel\">\n<p>Inner</p>\n</div>\n</div>\n</div>\n<p>:::</p>\n",
+    "example": 3204,
+    "start_line": 16,
+    "end_line": 24,
+    "section": "Marco nested tab markers treated as literal"
+  }
+]

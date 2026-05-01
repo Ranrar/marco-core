@@ -14,7 +14,7 @@ fn count_kind_in_document(document: &Document, kind: fn(&NodeKind) -> bool) -> u
 }
 
 #[test]
-fn test_tab_blocks_parse_to_ast() {
+fn test_tab_blocks_parse_builds_ast() {
     let input = ":::tab\n@tab First\nHello **world**\n\n- a\n- b\n\n@tab Second\n# Heading\n\n```\n@tab Not a tab\n:::\n```\n\n:::";
 
     let doc = parse(input).expect("parse failed");
@@ -49,7 +49,7 @@ fn test_tab_blocks_parse_to_ast() {
 }
 
 #[test]
-fn test_tab_blocks_render_to_expected_html_skeleton() {
+fn test_tab_blocks_render_matches_html_skeleton() {
     let input = ":::tab\n@tab A\nHello\n\n@tab B\nWorld\n\n:::";
 
     let doc = parse(input).expect("parse failed");
@@ -67,7 +67,7 @@ fn test_tab_blocks_render_to_expected_html_skeleton() {
 }
 
 #[test]
-fn test_nested_tab_blocks_do_not_create_nested_groups() {
+fn test_tab_blocks_nested_markers_do_not_create_nested_groups() {
     let input = ":::tab\n@tab Outer\n\n:::tab\n@tab Inner\nInner\n\n:::\n\n:::";
 
     let doc = parse(input).expect("parse failed");

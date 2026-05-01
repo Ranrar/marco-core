@@ -1,6 +1,9 @@
 # Spec fixtures
 
-Test fixtures used by `tests/commonmark_spec_conformance.rs`.
+Test fixtures used by:
+
+- `tests/commonmark_spec_it.rs`
+- `tools/tests/extension_spec_it.rs`
 
 ## `commonmark.json`
 
@@ -15,7 +18,12 @@ license. This file is included unmodified for regression-testing purposes.
 If you redistribute this file, you must preserve this attribution and license
 notice.
 
-## `extra.json`
+## Extension fixtures
 
-Marco-specific extension cases authored for this repository and licensed under
-the same MIT license as the rest of `marco-core`.
+The following fixture files are authored for this repository and licensed under
+the same MIT license as the rest of `marco-core`:
+
+- `diagram.json` — Mermaid/diagram-focused cases and edge cases.
+- `gfm.json` — GitHub Flavored Markdown extension cases.
+- `marco.json` — Marco-specific extension cases.
+- `math.json` — math delimiter and rendering cases.

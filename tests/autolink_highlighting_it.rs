@@ -2,7 +2,7 @@ use marco_core::intelligence::{compute_highlights, HighlightTag};
 use marco_core::parser::{Document, Node, NodeKind, Position, Span};
 
 #[test]
-fn integration_test_autolink_highlighting_multi_byte_url() {
+fn test_autolink_highlighting_multi_byte_url() {
     // Link with multi-byte characters (example internationalized domain + emoji path)
     let multi_url = "https://例子.测试/路径/🎨".to_string();
 

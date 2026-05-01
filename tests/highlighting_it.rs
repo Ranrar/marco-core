@@ -1,8 +1,8 @@
-use marco_core::intelligence::{compute_highlights, HighlightTag};
+use marco_core::intelligence::{compute_highlights, compute_highlights_with_source, HighlightTag};
 use marco_core::parser::{Document, Node, NodeKind, Position, Span};
 
 #[test]
-fn integration_test_compute_highlights_multi_byte() {
+fn test_compute_highlights_multi_byte() {
     // Build a document with several nodes including multi-byte content
     let doc = Document {
         children: vec![
@@ -82,4 +82,67 @@ fn integration_test_compute_highlights_multi_byte() {
     } else {
         panic!("Missing Heading1 highlight");
     }
+}
+
+#[test]
+fn test_compute_highlights_with_source_adds_tab_block_markers() {
+    use marco_core::parse;
+
+    let source = ":::tab\n@tab First\nContent A\n@tab Second\nContent B\n:::\n";
+    let doc = parse(source).expect("parse failed");
+
+    // compute_highlights only produces AST-derived highlights
+    let ast_highlights = compute_highlights(&doc);
+    // compute_highlights_with_source additionally scans source for tab block markers
+    let source_highlights = compute_highlights_with_source(&doc, source);
+
+    // The with_source variant must produce at least as many highlights
+    assert!(
+        source_highlights.len() >= ast_highlights.len(),
+        "with_source should never produce fewer highlights than the AST-only variant"
+    );
+
+    // Should contain at least one TabBlockContainer or TabBlockHeader tag
+    let has_tab_marker = source_highlights
+        .iter()
+        .any(|h| h.tag == HighlightTag::TabBlockContainer || h.tag == HighlightTag::TabBlockHeader);
+    assert!(
+        has_tab_marker,
+        "expected tab-block marker highlights from source scan; got: {source_highlights:?}"
+    );
+}
+
+#[test]
+fn test_compute_highlights_with_source_adds_slider_markers() {
+    use marco_core::parse;
+
+    let source = "@slidestart:t5\n# Slide One\n---\n# Slide Two\n@slideend\n";
+    let doc = parse(source).expect("parse failed");
+
+    let source_highlights = compute_highlights_with_source(&doc, source);
+
+    let has_slider = source_highlights
+        .iter()
+        .any(|h| matches!(h.tag, HighlightTag::SliderDeckMarker | HighlightTag::SliderSeparatorHorizontal));
+    assert!(
+        has_slider,
+        "expected slider marker highlights from source scan; got: {source_highlights:?}"
+    );
+}
+
+#[test]
+fn test_compute_highlights_with_source_matches_ast_only_for_plain_markdown() {
+    use marco_core::parse;
+
+    // Plain markdown has no tab/slider markers → both variants must produce identical results
+    let source = "# Heading\n\nA paragraph with **bold** and *italic*.\n";
+    let doc = parse(source).expect("parse failed");
+
+    let ast_only = compute_highlights(&doc);
+    let with_source = compute_highlights_with_source(&doc, source);
+
+    assert_eq!(
+        ast_only, with_source,
+        "for plain markdown without marcos, both highlight variants should be identical"
+    );
 }
