@@ -24,7 +24,7 @@ fn theme_set() -> &'static ThemeSet {
 }
 
 fn select_theme(theme_mode: &str) -> Theme {
-    // Normalize theme mode to a small set. We accept strings like "dark", "Dark", "marco-dark".
+    // Normalize theme mode to a small set. We accept strings like "dark", "Dark", and app-specific dark aliases.
     let is_dark = theme_mode.to_ascii_lowercase().contains("dark");
 
     let ts = theme_set();

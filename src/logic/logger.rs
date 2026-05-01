@@ -9,6 +9,7 @@ use std::sync::{Mutex, OnceLock};
 
 static LOGGER: OnceLock<&'static SimpleFileLogger> = OnceLock::new();
 
+/// File-backed logger implementation used by this crate.
 pub struct SimpleFileLogger {
     inner: Mutex<Option<BufWriter<File>>>,
     file_path: PathBuf,
@@ -21,16 +22,17 @@ pub struct SimpleFileLogger {
 const MAX_LOG_BYTES: u64 = 10 * 1024 * 1024; // 10 MiB
 
 impl SimpleFileLogger {
+    /// Initialize the global file logger.
     pub fn init(enabled: bool, level: LevelFilter) -> Result<(), Box<dyn std::error::Error>> {
         if !enabled {
             log::set_max_level(LevelFilter::Off);
             return Ok(());
         }
 
-        // Use platform-appropriate cache directory for logs
+        // Use platform-appropriate cache directories for logs.
         // **Windows Portable Mode**: {exe_dir}\logs\
-        // **Windows Installed Mode**: %LOCALAPPDATA%\Marco\logs
-        // **Linux**: ~/.cache/marco/logs
+        // **Windows Installed Mode**: %LOCALAPPDATA%\<editor>\logs
+        // **Linux**: ~/.cache/<editor>/logs
 
         let mut log_root: Option<PathBuf> = {
             // Windows: portable mode + Windows-specific fallbacks.
@@ -250,6 +252,7 @@ impl Log for SimpleFileLogger {
     }
 }
 
+/// Initialize file logging with enable flag and maximum log level.
 pub fn init_file_logger(
     enabled: bool,
     level: LevelFilter,
@@ -465,4 +468,67 @@ fn is_dir_writable(dir: &std::path::Path) -> bool {
             std::fs::remove_file(&test_file)
         })
         .is_ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn smoke_test_safe_preview_ascii() {
+        assert_eq!(safe_preview("Hello, world!", 5), "Hello");
+        assert_eq!(safe_preview("Hi", 100), "Hi");
+        assert_eq!(safe_preview("", 10), "");
+    }
+
+    #[test]
+    fn smoke_test_safe_preview_multibyte_emoji() {
+        // "😀" is a 4-byte character; safe_preview counts chars, not bytes
+        let s = "😀 café";
+        assert_eq!(safe_preview(s, 1), "😀");
+        assert_eq!(safe_preview(s, 3), "😀 c");
+    }
+
+    #[test]
+    fn smoke_test_safe_preview_zero_limit() {
+        assert_eq!(safe_preview("anything", 0), "");
+    }
+
+    #[test]
+    fn smoke_test_is_file_logger_initialized_returns_bool() {
+        // Before any init call in this test process the result is either
+        // true (another test initialised it) or false — it must not panic.
+        let _ = is_file_logger_initialized();
+    }
+
+    #[test]
+    fn smoke_test_log_path_helpers_return_non_empty_paths() {
+        // These functions compute deterministic paths and must not panic.
+        let root = current_log_root_dir();
+        assert!(!root.as_os_str().is_empty(), "log root dir must not be empty");
+
+        let dir = current_log_dir();
+        assert!(!dir.as_os_str().is_empty(), "log dir must not be empty");
+
+        let file = current_log_file_for_today();
+        assert!(!file.as_os_str().is_empty(), "log file path must not be empty");
+
+        // log dir should be a subdirectory of root
+        assert!(
+            dir.starts_with(&root),
+            "current_log_dir() should be nested inside current_log_root_dir()"
+        );
+
+        // today's file should be inside the log dir
+        assert!(
+            file.starts_with(&dir),
+            "current_log_file_for_today() should be inside current_log_dir()"
+        );
+    }
+
+    #[test]
+    fn smoke_test_total_log_size_bytes_does_not_panic() {
+        // May return 0 if no log files exist; must not panic regardless.
+        let _size = total_log_size_bytes();
+    }
 }

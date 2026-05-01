@@ -1,4 +1,4 @@
-//! Marco inline task checkbox parser
+//! Inline task checkbox parser (extended syntax).
 //!
 //! Parses inline task checkbox markers that appear *mid-paragraph*, e.g.:
 //! `Do this [ ] today` or `Done? [x], great.`

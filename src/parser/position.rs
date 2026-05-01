@@ -33,8 +33,8 @@ use serde::{Deserialize, Serialize};
 /// 3. Convert column: `byte_offset → char_offset` using `char_indices()`
 /// 4. Set position: `iter_at_line(gtk_line).set_line_offset(char_offset)`
 ///
-/// See `marco/src/components/editor/intelligence_integration.rs::position_to_iter()`
-/// for the reference implementation.
+/// See the host editor's cursor-conversion bridge for a reference implementation
+/// of byte-to-character offset mapping.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Position {
     /// Line number (1-based, CommonMark convention)
@@ -86,6 +86,7 @@ pub struct Span {
 }
 
 impl Position {
+    /// Create a new source position from 1-based line/column and absolute offset.
     pub fn new(line: usize, column: usize, offset: usize) -> Self {
         Self {
             line,
@@ -110,6 +111,7 @@ impl Position {
 }
 
 impl Span {
+    /// Create a new span from inclusive start and exclusive end positions.
     pub fn new(start: Position, end: Position) -> Self {
         Self { start, end }
     }

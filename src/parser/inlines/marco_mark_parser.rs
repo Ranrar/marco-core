@@ -1,4 +1,4 @@
-//! Mark/highlight parser (Marco extension)
+//! Mark/highlight parser (extended syntax).
 
 use super::shared::{to_parser_span_range, GrammarSpan};
 use crate::grammar::inlines as grammar;

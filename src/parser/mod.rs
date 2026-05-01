@@ -1,18 +1,26 @@
-// Marco Parser - 100% CommonMark Compliant (652/652 spec examples passing)
-// nom-based parser with full UTF-8 support (em dashes, smart quotes, Japanese, Arabic, emoji)
+//! Parser entry points and AST-facing parser modules.
+//!
+//! The parser layer consumes grammar outputs and builds the crate AST.
 
+/// AST node and document types.
 pub mod ast;
+/// Position and span utilities.
 pub mod position;
+/// Shared parser span conversion helpers.
 pub mod shared;
 
-// Modular parser structure
+/// Block-level parser modules.
 pub mod blocks;
+/// Inline-level parser modules.
 pub mod inlines;
 
-// Re-export public API
+/// Re-export AST types.
 pub use ast::*;
+/// Re-export block parser entry point.
 pub use blocks::parse_blocks;
+/// Re-export inline parser entry point.
 pub use inlines::parse_inlines;
+/// Re-export position and span types.
 pub use position::*;
 
 /// Parse Markdown text into Document AST

@@ -1,4 +1,4 @@
-//! Platform mentions parser (Marco extension)
+//! Platform mentions parser (extended syntax).
 //!
 //! Syntax:
 //! - `@username[platform]`

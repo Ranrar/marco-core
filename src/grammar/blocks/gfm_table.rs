@@ -15,9 +15,13 @@ use nom::character::complete::{line_ending, not_line_ending};
 use nom::{IResult, Input};
 
 #[derive(Debug, Clone, PartialEq)]
+/// Parsed GFM table block spans (header, delimiter, and body rows).
 pub struct GfmTableBlock<'a> {
+    /// Header row span.
     pub header_line: Span<'a>,
+    /// Delimiter row span.
     pub delimiter_line: Span<'a>,
+    /// Body row spans.
     pub body_lines: Vec<Span<'a>>,
 }
 

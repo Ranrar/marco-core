@@ -1,24 +1,41 @@
-// HTML renderer: AST → HTML for WebKit6 preview
+//! HTML renderer entry points and render support modules.
+//!
+//! This module exposes the stable rendering API used by consumers:
+//! [`render()`] and [`RenderOptions`].
 
+/// Base stylesheet used by preview rendering.
 pub mod base_css;
+/// Language normalization and metadata for code blocks.
 pub mod code_languages;
+/// Diagram rendering helpers (for example Mermaid).
 pub mod diagram;
+/// Core Markdown AST to HTML renderer.
 pub mod markdown;
+/// Math rendering helpers.
 pub mod math;
+/// Public render configuration options.
 pub mod options;
+/// Platform mention rendering helpers.
 pub mod plarform_mentions;
+/// HTML document wrappers for preview pages.
 pub mod preview_document;
+/// Syntax highlighting support based on syntect.
 pub mod syntect_highlighter;
 
+/// Re-export code language helpers.
 pub use code_languages::*;
+/// Re-export core HTML render helpers.
 pub use markdown::*;
+/// Re-export render options.
 pub use options::*;
+/// Re-export preview document helpers.
 pub use preview_document::*;
+/// Re-export syntax highlighter helpers.
 pub use syntect_highlighter::*;
 
 use crate::parser::Document;
 
-// Main render entry point
+/// Render a parsed Markdown [`Document`] into HTML.
 pub fn render(
     document: &Document,
     options: &RenderOptions,

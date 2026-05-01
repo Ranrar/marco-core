@@ -1,4 +1,4 @@
-//! Inline footnotes (Marco extension).
+//! Inline footnotes (extended syntax).
 //!
 //! Syntax: `^[footnote content]`
 //!

@@ -2,6 +2,7 @@
 use super::Span;
 use nom::{IResult, Input};
 
+/// Parse an inline CommonMark link and return `(text, url, optional_title)` spans.
 pub fn link(input: Span) -> IResult<Span, (Span, Span, Option<Span>)> {
     log::debug!("Parsing link at: {:?}", input.fragment());
     let start_input = input;

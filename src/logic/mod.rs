@@ -1,4 +1,5 @@
 pub mod cache;
+/// File-backed logging utilities.
 pub mod logger;
 pub mod text_completion;
 pub mod utf8;

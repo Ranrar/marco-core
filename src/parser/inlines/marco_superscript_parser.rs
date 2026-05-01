@@ -1,4 +1,4 @@
-//! Superscript parser (Marco extension)
+//! Superscript parser (extended syntax).
 
 use super::shared::{to_parser_span_range, GrammarSpan};
 use crate::grammar::inlines as grammar;

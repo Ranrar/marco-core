@@ -1,4 +1,4 @@
-//! Superscript grammar (Marco extension)
+//! Superscript grammar (extended syntax).
 //!
 //! Parses:
 //! - `^text^`

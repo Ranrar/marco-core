@@ -6,8 +6,11 @@
 //! Phase 2-4 Complete: All grammar functions now live in `blocks/` and `inlines/` subdirectories.
 
 // Modular grammar structure
+/// Block-level grammar modules.
 pub mod blocks;
+/// Inline-level grammar modules.
 pub mod inlines;
+/// Shared grammar types and helpers.
 pub mod shared;
 
 // Re-export shared types and utilities

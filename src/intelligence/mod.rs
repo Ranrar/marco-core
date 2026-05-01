@@ -40,15 +40,18 @@ pub struct MarkdownIntelligenceProvider {
 }
 
 impl MarkdownIntelligenceProvider {
+    /// Create a new intelligence provider with no active document.
     pub fn new() -> Self {
         log::info!("Markdown intelligence provider initialized");
         Self { document: None }
     }
 
+    /// Replace the currently analyzed document.
     pub fn update_document(&mut self, document: Document) {
         self.document = Some(document);
     }
 
+    /// Compute semantic highlights for the current document using source-aware markers.
     pub fn highlights(&self, source: &str) -> Vec<Highlight> {
         self.document
             .as_ref()
@@ -56,6 +59,7 @@ impl MarkdownIntelligenceProvider {
             .unwrap_or_default()
     }
 
+    /// Compute diagnostics for the current document.
     pub fn diagnostics(&self) -> Vec<Diagnostic> {
         self.document
             .as_ref()
@@ -63,6 +67,7 @@ impl MarkdownIntelligenceProvider {
             .unwrap_or_default()
     }
 
+    /// Compute diagnostics for the current document using custom options.
     pub fn diagnostics_with_options(&self, options: DiagnosticsOptions) -> Vec<Diagnostic> {
         self.document
             .as_ref()
@@ -70,12 +75,14 @@ impl MarkdownIntelligenceProvider {
             .unwrap_or_default()
     }
 
+    /// Resolve hover information for a source position.
     pub fn hover(&self, position: Position) -> Option<HoverInfo> {
         self.document
             .as_ref()
             .and_then(|doc| get_hover_info(position, doc))
     }
 
+    /// Get completion candidates for a query.
     pub fn completions(&self, query: &str) -> Vec<CompletionItem> {
         get_markdown_completions(query)
     }

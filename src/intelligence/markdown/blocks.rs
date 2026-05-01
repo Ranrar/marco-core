@@ -5,31 +5,55 @@
 use super::ast::{is_block_kind, Document, Node, NodeKind};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+/// Block-level semantic categories for AST nodes.
 pub enum BlockCategory {
+    /// Heading block.
     Heading,
+    /// Paragraph block.
     Paragraph,
+    /// Code block.
     CodeBlock,
+    /// Thematic break block.
     ThematicBreak,
+    /// List container block.
     List,
+    /// List item block.
     ListItem,
+    /// Definition list block.
     DefinitionList,
+    /// Definition term block.
     DefinitionTerm,
+    /// Definition description block.
     DefinitionDescription,
+    /// Task checkbox block marker.
     TaskCheckbox,
+    /// Blockquote block.
     Blockquote,
+    /// Admonition block.
     Admonition,
+    /// Tab group block.
     TabGroup,
+    /// Tab item block.
     TabItem,
+    /// Slider deck block.
     SliderDeck,
+    /// Slide block.
     Slide,
+    /// Table block.
     Table,
+    /// Table row block.
     TableRow,
+    /// Table cell block.
     TableCell,
+    /// HTML block.
     HtmlBlock,
+    /// Footnote definition block.
     FootnoteDefinition,
+    /// Mermaid diagram block.
     MermaidDiagram,
 }
 
+/// Classify a node kind as a block category when applicable.
 pub fn classify_block_kind(kind: &NodeKind) -> Option<BlockCategory> {
     match kind {
         NodeKind::Heading { .. } => Some(BlockCategory::Heading),
@@ -58,6 +82,7 @@ pub fn classify_block_kind(kind: &NodeKind) -> Option<BlockCategory> {
     }
 }
 
+/// Returns `true` when the node is considered block-level.
 pub fn is_block_node(node: &Node) -> bool {
     is_block_kind(&node.kind)
 }

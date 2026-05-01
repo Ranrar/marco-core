@@ -22,11 +22,18 @@ use nom::{
     IResult, Input, Parser,
 };
 
-// List marker types
+/// List marker variants supported by CommonMark lists.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ListMarker {
-    Bullet(char),                             // -, +, or *
-    Ordered { number: u32, delimiter: char }, // 1. or 1)
+    /// Unordered marker (`-`, `+`, or `*`).
+    Bullet(char),
+    /// Ordered marker (`1.` or `1)`) with parsed components.
+    Ordered {
+        /// Parsed ordered list start number.
+        number: u32,
+        /// Ordered-list delimiter character (`.` or `)`).
+        delimiter: char,
+    },
 }
 
 /// Detect list marker at start of line

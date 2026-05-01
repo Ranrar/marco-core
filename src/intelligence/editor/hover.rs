@@ -4,11 +4,15 @@ use crate::logic::utf8::substring_by_chars;
 use crate::parser::{Document, Node, NodeKind, Position, Span};
 
 #[derive(Debug, Clone)]
+/// Hover payload returned for a cursor position.
 pub struct HoverInfo {
+    /// Markdown-formatted hover contents.
     pub contents: String,
+    /// Optional source range covered by this hover payload.
     pub range: Option<Span>,
 }
 
+/// Resolve hover information at the given source position.
 pub fn get_hover_info(position: Position, document: &Document) -> Option<HoverInfo> {
     for node in &document.children {
         if let Some(hover) = find_hover_at_position(node, position) {

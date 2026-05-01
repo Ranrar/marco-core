@@ -7,10 +7,15 @@ use crate::parser::Document;
 use std::collections::BTreeMap;
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
+/// Aggregate counts grouped by diagnostic severity.
 pub struct LintReport {
+    /// Number of error diagnostics.
     pub errors: usize,
+    /// Number of warning diagnostics.
     pub warnings: usize,
+    /// Number of info diagnostics.
     pub infos: usize,
+    /// Number of hint diagnostics.
     pub hints: usize,
 }
 
@@ -37,14 +42,20 @@ impl LintReport {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+/// Count bucket for a single diagnostic code.
 pub struct LintCodeBucket {
+    /// Diagnostic code represented by this bucket.
     pub code: DiagnosticCode,
+    /// Number of diagnostics for this code.
     pub count: usize,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
+/// Detailed lint report including summary and per-code buckets.
 pub struct LintDetailedReport {
+    /// Severity summary.
     pub summary: LintReport,
+    /// Per-code diagnostic counts.
     pub by_code: Vec<LintCodeBucket>,
 }
 

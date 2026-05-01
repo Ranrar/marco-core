@@ -1,11 +1,15 @@
-// Rendering options and configuration
+//! Rendering options and configuration.
 
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// Configuration options for HTML rendering.
 pub struct RenderOptions {
+    /// Enable syntax highlighting for fenced code blocks when possible.
     pub syntax_highlighting: bool,
+    /// Show line numbers in rendered code blocks.
     pub line_numbers: bool,
+    /// Theme name used by renderer and highlighter integrations.
     pub theme: String,
 }
 

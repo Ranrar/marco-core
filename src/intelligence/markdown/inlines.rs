@@ -5,29 +5,51 @@
 use super::ast::{is_inline_kind, Node, NodeKind};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+/// Inline semantic categories for AST nodes.
 pub enum InlineCategory {
+    /// Plain text inline node.
     Text,
+    /// Inline task checkbox marker node.
     TaskCheckboxInline,
+    /// Emphasis inline node.
     Emphasis,
+    /// Strong inline node.
     Strong,
+    /// Strong+emphasis inline node.
     StrongEmphasis,
+    /// Strikethrough inline node.
     Strikethrough,
+    /// Mark/highlight inline node.
     Mark,
+    /// Superscript inline node.
     Superscript,
+    /// Subscript inline node.
     Subscript,
+    /// Link inline node.
     Link,
+    /// Reference-style link inline node.
     LinkReference,
+    /// Footnote reference inline node.
     FootnoteReference,
+    /// Image inline node.
     Image,
+    /// Code span inline node.
     CodeSpan,
+    /// Inline HTML node.
     InlineHtml,
+    /// Hard line break inline node.
     HardBreak,
+    /// Soft line break inline node.
     SoftBreak,
+    /// Platform mention inline node.
     PlatformMention,
+    /// Inline math node.
     InlineMath,
+    /// Display math node.
     DisplayMath,
 }
 
+/// Classify a node kind as an inline category when applicable.
 pub fn classify_inline_kind(kind: &NodeKind) -> Option<InlineCategory> {
     match kind {
         NodeKind::Text(_) => Some(InlineCategory::Text),
@@ -54,6 +76,7 @@ pub fn classify_inline_kind(kind: &NodeKind) -> Option<InlineCategory> {
     }
 }
 
+/// Returns `true` when the node is considered inline-level.
 pub fn is_inline_node(node: &Node) -> bool {
     is_inline_kind(&node.kind)
 }

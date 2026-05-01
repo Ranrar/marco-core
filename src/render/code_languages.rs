@@ -1,6 +1,6 @@
 //! Code fence language normalization.
 //!
-//! This module exists so both `marco` and `polo` can share:
+//! This module exists so both the editor and viewer can share:
 //! - a small, curated list of common language aliases
 //! - consistent display labels (e.g. `rs` -> `Rust`)
 //!
@@ -10,6 +10,7 @@
 use std::borrow::Cow;
 
 #[derive(Debug, Clone, Copy)]
+/// Canonical code-language name plus accepted aliases.
 pub struct CodeLanguage {
     /// Canonical name used for display and (typically) for syntect token lookup.
     pub canonical: &'static str,

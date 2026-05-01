@@ -211,7 +211,7 @@ pub fn parse_inlines_from_span(span: GrammarSpan) -> Result<Vec<Node>, Box<dyn s
             continue;
         }
 
-        // Marco extension: inline footnotes `^[...]`.
+        // Extended syntax: inline footnotes `^[...]`.
         // Try before superscript since both start with '^'.
         if let Ok((rest, (ref_node, def_node))) = parse_inline_footnote(remaining) {
             nodes.push(ref_node);
@@ -260,7 +260,7 @@ pub fn parse_inlines_from_span(span: GrammarSpan) -> Result<Vec<Node>, Box<dyn s
             continue;
         }
 
-        // Marco extension: inline task checkbox markers mid-paragraph.
+        // Extended syntax: inline task checkbox markers mid-paragraph.
         // This must come before link parsing since it starts with '['.
         if is_task_checkbox_inline_start_boundary_ok(&nodes, remaining.fragment()) {
             if let Ok((rest, node)) = parse_task_checkbox_inline(remaining) {
@@ -323,14 +323,14 @@ pub fn parse_inlines_from_span(span: GrammarSpan) -> Result<Vec<Node>, Box<dyn s
             continue;
         }
 
-        // Try parsing emoji shortcodes (Marco extension), e.g. :joy:
+        // Try parsing emoji shortcodes (extended syntax), e.g. :joy:
         if let Ok((rest, node)) = parse_emoji_shortcode(remaining) {
             nodes.push(node);
             remaining = rest;
             continue;
         }
 
-        // Try parsing platform mentions (Marco extension), e.g. @user[github](Name)
+        // Try parsing platform mentions (extended syntax), e.g. @user[github](Name)
         if let Ok((rest, node)) = parse_platform_mention(remaining) {
             nodes.push(node);
             remaining = rest;

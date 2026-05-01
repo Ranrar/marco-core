@@ -41,13 +41,13 @@ pub fn parse_text(input: GrammarSpan) -> IResult<GrammarSpan, Node> {
         super::gfm_autolink_literal_parser::find_next_autolink_literal_start(text_fragment)
             .unwrap_or(text_fragment.len());
 
-    // Emoji shortcodes (Marco extension) can appear in the middle of a text node.
+    // Emoji shortcodes (extended syntax) can appear in the middle of a text node.
     // Only stop for *recognized* shortcodes; unknown ones remain literal.
     let next_emoji_shortcode =
         super::marco_emoji_shortcode_parser::find_next_emoji_shortcode_start(text_fragment)
             .unwrap_or(text_fragment.len());
 
-    // Platform mentions (Marco extension) can appear in the middle of a text node.
+    // Platform mentions (extended syntax) can appear in the middle of a text node.
     let next_platform_mention =
         super::marco_platform_mentions_parser::find_next_platform_mention_start(text_fragment)
             .unwrap_or(text_fragment.len());

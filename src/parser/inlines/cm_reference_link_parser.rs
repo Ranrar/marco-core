@@ -93,6 +93,7 @@ fn is_valid_reference_label_content(label: &str) -> bool {
     true
 }
 
+/// Parse CommonMark reference-style links and emit a `NodeKind::LinkReference` placeholder.
 pub fn parse_reference_link(input: GrammarSpan) -> IResult<GrammarSpan, Node> {
     let start_input = input;
     let content_str = input.fragment();

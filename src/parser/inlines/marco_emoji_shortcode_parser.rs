@@ -1,4 +1,4 @@
-//! Emoji shortcode parser (Markdown Guide extended syntax; Marco extension)
+//! Emoji shortcode parser (Markdown Guide extended syntax).
 //!
 //! Syntax: `:shortcode:`
 //!

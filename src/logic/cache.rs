@@ -1,4 +1,4 @@
-//! Caching System for Marco
+//! Caching system for editor and viewer integrations.
 //!
 //! Provides two types of caching:
 //! 1. **File Caching** (SimpleFileCache): Cache file content with modification time tracking
@@ -30,12 +30,16 @@ use std::time::{SystemTime, UNIX_EPOCH};
 /// Simple cache entry for file content (as per spec)
 #[derive(Debug, Clone)]
 pub struct CachedFile {
+    /// Shared file content payload.
     pub content: Arc<String>,
+    /// File modification time (seconds since Unix epoch) used for validation.
     pub modification_time: u64,
+    /// Timestamp of last cache access.
     pub last_accessed: SystemTime,
 }
 
 impl CachedFile {
+    /// Create a new cached file entry.
     pub fn new(content: String, modification_time: u64) -> Self {
         Self {
             content: Arc::new(content),
@@ -278,9 +282,13 @@ impl Default for ParserCache {
 /// Cache statistics
 #[derive(Debug, Clone, Copy)]
 pub struct CacheStats {
+    /// Current AST cache entry count.
     pub ast_entries: u64,
+    /// Current HTML cache entry count.
     pub html_entries: u64,
+    /// Configured AST cache capacity.
     pub ast_capacity: u64,
+    /// Configured HTML cache capacity.
     pub html_capacity: u64,
 }
 
@@ -505,6 +513,66 @@ mod tests {
         let html2 = parse_to_html_cached(content, options).expect("Parse failed");
         assert_eq!(html1, html2);
     }
+
+    #[test]
+    fn smoke_test_file_cache_invalidate_file_removes_entry() {
+        let cache = SimpleFileCache::new();
+
+        let mut temp_file = NamedTempFile::new().expect("failed to create temp file");
+        writeln!(temp_file, "original content").expect("failed to write");
+        let path = temp_file.path().to_path_buf();
+
+        // Load to populate cache
+        let first = cache.load_file_fast(&path).expect("load failed");
+        assert!(first.contains("original content"));
+
+        // Overwrite file on disk (cache still has old value)
+        std::fs::write(&path, "updated content").expect("write failed");
+
+        // Without invalidation the cache still returns old content
+        let cached = cache.load_file_fast(&path).expect("load failed");
+        assert!(
+            cached.contains("original content"),
+            "expected stale cache before invalidation"
+        );
+
+        // After invalidation the next load reads the fresh file
+        cache.invalidate_file(&path);
+        let refreshed = cache.load_file_fast(&path).expect("load after invalidate failed");
+        assert!(
+            refreshed.contains("updated content"),
+            "expected fresh content after invalidate_file"
+        );
+    }
+
+    #[test]
+    fn smoke_test_cached_read_to_string_returns_file_contents() {
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let file_path = temp_dir.path().join("cached_read_test.md");
+        std::fs::write(&file_path, "# Cached Read\n\nHello world.\n")
+            .expect("failed to write test file");
+
+        let content = cached::read_to_string(&file_path)
+            .expect("cached::read_to_string should succeed for a valid file");
+
+        assert!(
+            content.contains("# Cached Read"),
+            "returned content should contain the written heading"
+        );
+        assert!(
+            content.contains("Hello world."),
+            "returned content should contain the written body"
+        );
+    }
+
+    #[test]
+    fn smoke_test_cached_read_to_string_errors_for_missing_file() {
+        let result = cached::read_to_string("/tmp/marco_core_does_not_exist_xyzzy_test.md");
+        assert!(
+            result.is_err(),
+            "reading a non-existent file must return Err"
+        );
+    }
 }
 
 /// Global cache instance (singleton pattern as per spec)
@@ -530,6 +598,7 @@ pub fn shutdown_global_cache() {
 pub mod cached {
     use super::*;
 
+    /// Read a file as UTF-8 text using the global file cache.
     pub fn read_to_string<P: AsRef<Path>>(path: P) -> Result<String, Box<dyn std::error::Error>> {
         global_cache().load_file_fast(path)
     }
