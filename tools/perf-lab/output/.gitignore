@@ -7,6 +7,3 @@
 # Keep sentinel files and the baseline manifest
 !.gitkeep
 !baseline/workload-manifest-v1.json
-
-# Keep hand-authored summary documents in summary/
-!summary/COMPARISON_RAW_vs_FULL_FEATURED.md

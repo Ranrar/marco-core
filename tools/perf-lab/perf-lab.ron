@@ -1,0 +1,11 @@
+(
+  spec_dir: "tools/spec",
+  local_fixtures_dir: "tools/perf-lab/fixtures",
+  output_dir: "tools/perf-lab/output",
+  baseline_manifest: Some("tools/perf-lab/output/baseline/workload-manifest-v1.json"),
+  profiles: ["commonmark-core", "gfm-core", "marco-extensions"],
+  default_engine: "marco-core",
+  strict: false,
+  synthetic_enabled: true,
+  synthetic_seed: 1337,
+)
