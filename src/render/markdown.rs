@@ -10,7 +10,7 @@ use std::collections::HashMap;
 // Code block copy button icon (Tabler icon-tabler-copy).
 const CODE_BLOCK_COPY_SVG: &str = r#"<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1' stroke-linecap='round' stroke-linejoin='round' class='icon icon-tabler icons-tabler-outline icon-tabler-copy'><path stroke='none' d='M0 0h24v24H0z' fill='none'/><path d='M7 9.667a2.667 2.667 0 0 1 2.667 -2.667h8.666a2.667 2.667 0 0 1 2.667 2.667v8.666a2.667 2.667 0 0 1 -2.667 2.667h-8.666a2.667 2.667 0 0 1 -2.667 -2.667l0 -8.666' /><path d='M4.012 16.737a2.005 2.005 0 0 1 -1.012 -1.737v-10c0 -1.1 .9 -2 2 -2h10c.75 0 1.158 .385 1.5 1' /></svg>"#;
 
-// Marco sliders UI icons (Tabler).
+// Slide-deck UI icons (Tabler).
 // These are embedded as inline SVG so they inherit `currentColor`.
 const SLIDER_ARROW_LEFT_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-arrow-narrow-left" aria-hidden="true"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M5 12l14 0" /><path d="M5 12l4 4" /><path d="M5 12l4 -4" /></svg>"#;
 
@@ -38,7 +38,7 @@ struct RenderContext<'a> {
     heading_slug_counts: HashMap<String, usize>,
 }
 
-// Render document to HTML
+/// Render a parsed Markdown document into HTML.
 pub fn render_html(
     document: &Document,
     options: &RenderOptions,
@@ -156,10 +156,10 @@ fn render_node(
             let language_raw = language.as_deref().map(str::trim).filter(|s| !s.is_empty());
 
             // Wrap code block in a container for copy button positioning
-            output.push_str("<div class=\"marco-code-block-wrapper\">");
+            output.push_str("<div class=\"marco-code-block\">");
 
             // Add copy button
-            output.push_str("<button class=\"marco-code-copy-btn\" data-action=\"copy\" aria-label=\"Copy code\" title=\"Copy code\">");
+            output.push_str("<button class=\"marco-copy-btn\" data-action=\"copy\" aria-label=\"Copy code\" title=\"Copy code\">");
             output.push_str(CODE_BLOCK_COPY_SVG);
             output.push_str("</button>");
 
@@ -393,7 +393,7 @@ fn render_node(
             let platform_key = platform.trim().to_ascii_lowercase();
 
             if let Some(url) = plarform_mentions::profile_url(&platform_key, username) {
-                output.push_str("<a class=\"marco-mention mention-");
+                output.push_str("<a class=\"marco-mention marco-mention-");
                 output.push_str(&escape_html(&platform_key));
                 output.push_str("\" href=\"");
                 output.push_str(&escape_html(&url));
@@ -401,7 +401,7 @@ fn render_node(
                 output.push_str(&escape_html(label));
                 output.push_str("</a>");
             } else {
-                output.push_str("<span class=\"marco-mention mention-unknown\">");
+                output.push_str("<span class=\"marco-mention marco-mention-unknown\">");
                 output.push_str(&escape_html(label));
                 output.push_str("</span>");
             }
@@ -581,7 +581,7 @@ fn render_node(
 
             match rendered {
                 Ok(svg) => {
-                    output.push_str("<div class=\"marco-mermaid\">");
+                    output.push_str("<div class=\"marco-diagram\">");
                     output.push_str(&svg);
                     output.push_str("</div>\n");
                 }
@@ -873,20 +873,20 @@ fn render_task_checkbox_icon(output: &mut String, checked: bool) {
     // - checkmark: theme accent
     if checked {
         output.push_str(
-            r#"<span class="task-list-item-checkbox marco-task-checkbox checked" aria-hidden="true">"#,
+            r#"<span class="marco-marco-marco-task-checkbox checked" aria-hidden="true">"#,
         );
         output.push_str(
             concat!(
                 r#"<svg xmlns=""#,
                 "http",
                 r#"://www.w3.org/2000/svg"#,
-                r#"" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" class="marco-task-icon"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path class="marco-task-check" style="stroke: var(--marco-task-accent); stroke-width: 2.0;" d="M9 11l3 3l8 -8" /><path class="marco-task-box" style="stroke: var(--marco-task-primary);" d="M3 5a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-14" /></svg>"#,
+                r#"" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" class="marco-task-icon"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path class="marco-task-check" style="stroke: var(--mc-task-accent); stroke-width: 2.0;" d="M9 11l3 3l8 -8" /><path class="marco-task-box" style="stroke: var(--mc-task-primary);" d="M3 5a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-14" /></svg>"#,
             ),
         );
         output.push_str("</span>");
     } else {
         output.push_str(
-            r#"<span class="task-list-item-checkbox marco-task-checkbox unchecked" aria-hidden="true">"#,
+            r#"<span class="marco-marco-marco-task-checkbox unchecked" aria-hidden="true">"#,
         );
         output.push_str(
             concat!(
@@ -1015,9 +1015,9 @@ fn render_list_item(
 
     if let Some(checked) = task_checked {
         if checked {
-            output.push_str("<li class=\"task-list-item task-list-item-checked\">");
+            output.push_str("<li class=\"marco-marco-task-list-item marco-marco-task-list-item--checked\">");
         } else {
-            output.push_str("<li class=\"task-list-item\">");
+            output.push_str("<li class=\"marco-task-list-item\">");
         }
     } else {
         output.push_str("<li>");
@@ -1203,8 +1203,8 @@ mod tests {
         let options = RenderOptions::default();
         let result = render_html(&doc, &options).unwrap();
         // Should contain wrapper div and copy button
-        assert!(result.contains("<div class=\"marco-code-block-wrapper\">"));
-        assert!(result.contains("<button class=\"marco-code-copy-btn\""));
+        assert!(result.contains("<div class=\"marco-code-block\">"));
+        assert!(result.contains("<button class=\"marco-copy-btn\""));
         assert!(result.contains("icon-tabler-copy"));
         assert!(result
             .contains("<pre><code>fn main() {\n    println!(&quot;Hello&quot;);\n}</code></pre>"));
@@ -1230,8 +1230,8 @@ mod tests {
         };
         let result = render_html(&doc, &options).unwrap();
         // Should contain wrapper div, copy button, and language attribute
-        assert!(result.contains("<div class=\"marco-code-block-wrapper\">"));
-        assert!(result.contains("<button class=\"marco-code-copy-btn\""));
+        assert!(result.contains("<div class=\"marco-code-block\">"));
+        assert!(result.contains("<button class=\"marco-copy-btn\""));
         assert!(result.contains(
             "<pre data-language=\"Rust\"><code class=\"language-rust\">let x = 42;</code></pre>"
         ));
@@ -1257,8 +1257,8 @@ mod tests {
         };
         let result = render_html(&doc, &options).unwrap();
         // Should contain wrapper, copy button, and properly escaped HTML
-        assert!(result.contains("<div class=\"marco-code-block-wrapper\">"));
-        assert!(result.contains("<button class=\"marco-code-copy-btn\""));
+        assert!(result.contains("<div class=\"marco-code-block\">"));
+        assert!(result.contains("<button class=\"marco-copy-btn\""));
         assert!(result.contains("<pre data-language=\"HTML\"><code class=\"language-html\">&lt;div&gt;Test &amp; verify&lt;/div&gt;</code></pre>"));
         assert!(result.contains("</div>\n"));
     }
@@ -1335,8 +1335,8 @@ mod tests {
         // Should contain heading (now with auto-slug id), paragraph, and code block with wrapper
         assert!(result.contains("<h1 id=\"title\">"));
         assert!(result.contains("<p>Some text.</p>\n"));
-        assert!(result.contains("<div class=\"marco-code-block-wrapper\">"));
-        assert!(result.contains("<button class=\"marco-code-copy-btn\""));
+        assert!(result.contains("<div class=\"marco-code-block\">"));
+        assert!(result.contains("<button class=\"marco-copy-btn\""));
         assert!(result.contains("<pre data-language=\"Python\"><code class=\"language-python\">print(&#39;hello&#39;)</code></pre>"));
         assert!(result.contains("</div>\n"));
     }

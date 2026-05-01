@@ -3,16 +3,16 @@ use super::base_css;
 /// Shared HTML preview document wrapper.
 ///
 /// This is intentionally **UI-toolkit agnostic**: it just produces a full HTML
-/// document as a String. Both `marco` and `polo` load this into a WebKit WebView.
+/// document as a String. Both the editor and viewer can load this into a WebView.
 ///
-/// The embedded JS exposes `window.MarcoPreview` for smooth content updates and
+/// The embedded JS exposes a preview bridge for smooth content updates and
 /// installs interactive table resizing (column + row) in the rendered preview.
 ///
 /// CSS injection order:
 ///   1. `inline_bg_style`  — instant background-colour flash-prevention
-///   2. `base_css()`       — base structural stylesheet (all HTML elements + Marco components)
+///   2. `base_css()`       — base structural stylesheet (all HTML elements + viewer components)
 ///   3. `css`              — active theme token file (only CSS custom property declarations)
-///   4. `table_resize_css` — interactive table/slider/heading-anchor rules (separate `<style>`)
+///   4. `table_resize_css` — interactive table/slider/marco-heading-anchor rules (separate `<style>`)
 pub fn wrap_preview_html_document(
     body: &str,
     css: &str,
@@ -36,7 +36,7 @@ pub fn wrap_preview_html_document(
     // Table resize affordances (JS drives cursor; CSS disables selection during drag).
     // Keep this lightweight and self-contained to avoid fighting user themes.
     let table_resize_css = r#"
-/* Marco: interactive table resizing */
+/* Viewer: interactive table resizing */
 body.marco-table-resizing,
 body.marco-table-resizing * {
     -webkit-user-select: none !important;
@@ -53,7 +53,7 @@ table.marco-resize-active td {
     text-overflow: ellipsis;
 }
 
-/* Marco: heading anchor — the heading text itself is the link */
+/* Viewer: heading anchor - the heading text itself is the link */
 .marco-heading-anchor {
     text-decoration: none !important;
     color: inherit !important;
@@ -74,7 +74,7 @@ table.marco-resize-active td {
     background-clip: inherit !important;
 }
 
-/* Marco: internal and external links
+/* Viewer: internal and external links
    - Keeps links looking like normal links.
    - On hover/focus, suppresses theme hover effects.
    - Excludes the injected heading anchor link itself.
@@ -123,14 +123,14 @@ a[href^='mailto:']:not(.marco-heading-anchor):active {
 }
 
 
-/* Marco: sliders / slide decks */
+/* Viewer: sliders / slide decks */
 .marco-sliders {
     position: relative;
     margin: 1rem 0;
     padding: 0.75rem 0.9rem;
     border-radius: 10px;
-    border: 1px solid var(--marco-sliders-border, transparent);
-    background: var(--marco-sliders-bg, transparent);
+    border: 1px solid var(--mc-sliders-border, transparent);
+    background: var(--mc-sliders-bg, transparent);
 }
 
 .marco-sliders__viewport {
@@ -262,11 +262,11 @@ a[href^='mailto:']:not(.marco-heading-anchor):active {
         <meta charset=\"utf-8\">
         <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
         <link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css\" integrity=\"sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV\" crossorigin=\"anonymous\">
-        <style id=\"marco-preview-style\">{}{}</style>
-        <style id=\"marco-preview-internal-style\">{}</style>
+        <style id=\"mc-preview-style\">{}{}</style>
+        <style id=\"mc-preview-internal-style\">{}</style>
         <script>
-            // Marco Preview Management Object - prevents global namespace pollution
-            window.MarcoPreview = (function() {{
+            // Preview management object to avoid global namespace pollution
+            window.MarcoCorePreview = (function() {{
                 var scrollTimeouts = [];
                 var tableResizerCleanup = null;
                 var tableSizeState = Object.create(null);
@@ -594,9 +594,9 @@ a[href^='mailto:']:not(.marco-heading-anchor):active {
                             if (!target) return;
                             
                             // Handle code block copy button
-                            var copyBtn = target.closest('.marco-code-copy-btn');
+                            var copyBtn = target.closest('.marco-copy-btn');
                             if (copyBtn) {{
-                                var wrapper = copyBtn.closest('.marco-code-block-wrapper');
+                                var wrapper = copyBtn.closest('.marco-code-block');
                                 if (!wrapper) return;
                                 
                                 var codeEl = wrapper.querySelector('code');
@@ -1034,7 +1034,7 @@ a[href^='mailto:']:not(.marco-heading-anchor):active {
                         // Persist the last resize so it survives smooth preview updates.
                         try {{
                             function getTableKey(tbl) {{
-                                var container = document.getElementById('marco-content-container');
+                                var container = document.getElementById("mc-content-container");
                                 if (!container || !tbl) return null;
                                 var tables = container.querySelectorAll('table');
                                 for (var i = 0; i < tables.length; i++) {{
@@ -1156,7 +1156,7 @@ a[href^='mailto:']:not(.marco-heading-anchor):active {
                 // until the host app calls setContent()/updateContent().
                 try {{
                     document.addEventListener('DOMContentLoaded', function() {{
-                        var container = document.getElementById('marco-content-container');
+                        var container = document.getElementById("mc-content-container");
                         if (container) {{
                             applyStoredTableSizes(container);
                             installSliders(container);
@@ -1169,7 +1169,7 @@ a[href^='mailto:']:not(.marco-heading-anchor):active {
                 return {{
                     setCSS: function(css) {{
                         try {{
-                            var el = document.getElementById('marco-preview-style');
+                            var el = document.getElementById("mc-preview-style");
                             if (el) {{
                                 el.innerHTML = css;
                             }}
@@ -1195,7 +1195,7 @@ a[href^='mailto:']:not(.marco-heading-anchor):active {
                             var scrollTop = document.documentElement.scrollTop || document.body.scrollTop;
                             
                             // Update content container
-                            var container = document.getElementById('marco-content-container');
+                            var container = document.getElementById("mc-content-container");
                             if (container) {{
                                 container.innerHTML = htmlContent;
                                 applyStoredTableSizes(container);
@@ -1220,7 +1220,7 @@ a[href^='mailto:']:not(.marco-heading-anchor):active {
                     
                     setContent: function(htmlContent) {{
                         try {{
-                            var container = document.getElementById('marco-content-container');
+                            var container = document.getElementById("mc-content-container");
                             if (container) {{
                                 container.innerHTML = htmlContent;
                                 applyStoredTableSizes(container);
@@ -1246,14 +1246,14 @@ a[href^='mailto:']:not(.marco-heading-anchor):active {
             
             // Cleanup on page unload
             window.addEventListener('beforeunload', function() {{
-                if (window.MarcoPreview) {{
-                    MarcoPreview.cleanup();
+                if (window.MarcoCorePreview) {{
+                    MarcoCorePreview.cleanup();
                 }}
             }});
         </script>
     </head>
     <body>
-        <div id="marco-content-container">{}</div>
+        <div id="mc-content-container">{}</div>
     </body>
 </html>"#,
         theme_class, inline_bg_style, css, table_resize_css, body
@@ -1286,10 +1286,10 @@ pub struct PageViewOptions<'a> {
     /// Document title for the HTML `<title>` tag.  Pass `""` to omit the tag.
     /// Used for standalone HTML file exports; leave as `""` for live preview.
     pub title: &'a str,
-    /// When `true`, the WebKit-specific integration JS (scroll-sync signals,
-    /// `document.title = 'marco_paged_ready'` hooks) is replaced with a minimal
-    /// opacity-restore callback.  Set to `true` when producing a standalone HTML
-    /// file; leave `false` for live preview in the editor WebView.
+    /// When `true`, the WebView integration JS (scroll-sync signals and page-ready
+    /// title hooks) is replaced with a minimal opacity-restore callback.
+    /// Set to `true` when producing a standalone HTML file; leave `false`
+    /// for live preview in the editor WebView.
     pub standalone_export: bool,
 }
 
@@ -1297,8 +1297,8 @@ pub struct PageViewOptions<'a> {
 /// simulation.
 ///
 /// paged.js restructures the entire DOM into fixed-size page boxes, so **content updates
-/// in page view mode always require a full HTML reload** — the smooth `MarcoPreview.updateContent`
-/// path is incompatible.  The caller is responsible for triggering a full reload.
+/// in page view mode always require a full HTML reload** - incremental update
+/// paths are incompatible. The caller is responsible for triggering a full reload.
 ///
 /// # Arguments
 /// * `body` — Rendered markdown HTML body (without `<html>`/`<head>` wrapper).
@@ -1462,7 +1462,7 @@ html.theme-dark .pagedjs_page {{
     // Removes paged.js visual decorations so pages print without gaps or shadows.
     let export_css_block: &str = if page_opts.for_export {
         concat!(
-            "        <style id=\"marco-print-export-css\">\n",
+            "        <style id=\"mc-print-export-css\">\n",
             "@media print {\n",
             "  @page { margin: 0 !important; }\n",
             "  html, body { background-color: white !important; }\n",
@@ -1525,7 +1525,7 @@ window.PagedConfig = {
         window.__pagedJsJustReady = true;
         /* Tell Rust scroll-sync to restore the preview scroll to where the
            editor cursor currently is.                                      */
-        document.title = 'marco_paged_ready';
+        document.title = 'mc_paged_ready';
         window.__pagedJsReady = true;
         setTimeout(function() { window.__pagedJsJustReady = false; }, 500);
     }
@@ -1544,7 +1544,7 @@ setTimeout(function() {
     if (!window.__pagedJsReady) {
         document.body.style.opacity = '1';
         window.__pagedJsJustReady = true;
-        document.title = 'marco_paged_ready';
+        document.title = 'mc_paged_ready';
         window.__pagedJsReady = true;
         setTimeout(function() { window.__pagedJsJustReady = false; }, 500);
     }
@@ -1558,15 +1558,15 @@ setTimeout(function() {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-{}        <style id="marco-paged-page-css">
+{}        <style id="mc-paged-page-css">
 {}{}{}
         </style>
-        <style id="marco-preview-style">
+        <style id="mc-preview-style">
 {}{}
         </style>
 {}    </head>
     <body style="opacity:0">
-        <div id="marco-content-container">{}</div>
+        <div id="mc-content-container">{}</div>
         <script>
 {}
         </script>
@@ -1604,13 +1604,13 @@ mod tests {
             "dark",
             Some("#000000"),
         );
-        assert!(doc.contains("id=\\\"marco-preview-style\\\""));
-        assert!(doc.contains("id=\\\"marco-preview-internal-style\\\""));
-        assert!(doc.contains("window.MarcoPreview"));
+        assert!(doc.contains("id=\\\"mc-preview-style\\\""));
+        assert!(doc.contains("id=\\\"mc-preview-internal-style\\\""));
+        assert!(doc.contains("window.MarcoCorePreview"));
         assert!(doc.contains("installTableResizer"));
         assert!(doc.contains("installSliders"));
         assert!(doc.contains("sliders:"));
-        assert!(doc.contains("marco-content-container"));
+        assert!(doc.contains("content-container"));
     }
 
     #[test]
@@ -1638,7 +1638,7 @@ mod tests {
         assert!(doc.contains("A4 portrait"));
         assert!(doc.contains("20mm"));
         assert!(doc.contains("counter(page)"));
-        assert!(doc.contains("marco-content-container"));
+        assert!(doc.contains("content-container"));
         assert!(doc.contains("paged.js stub"));
     }
 
