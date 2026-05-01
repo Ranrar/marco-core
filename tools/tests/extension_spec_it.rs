@@ -59,25 +59,13 @@ fn run_fixture_suite(name: &str, json: &str) {
         let doc = parse(&case.markdown).unwrap_or_else(|e| {
             panic!(
                 "{} ex {} [{}] L{:?}-L{:?}: parse error: {}\nmarkdown: {:?}",
-                name,
-                case.example,
-                case.section,
-                case.start_line,
-                case.end_line,
-                e,
-                case.markdown
+                name, case.example, case.section, case.start_line, case.end_line, e, case.markdown
             )
         });
         let actual = render(&doc, &RenderOptions::default()).unwrap_or_else(|e| {
             panic!(
                 "{} ex {} [{}] L{:?}-L{:?}: render error: {}\nmarkdown: {:?}",
-                name,
-                case.example,
-                case.section,
-                case.start_line,
-                case.end_line,
-                e,
-                case.markdown
+                name, case.example, case.section, case.start_line, case.end_line, e, case.markdown
             )
         });
 

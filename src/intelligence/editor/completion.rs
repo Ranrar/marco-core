@@ -42,7 +42,10 @@ mod tests {
         );
         // All items must have non-empty insert_text and label
         for item in &items {
-            assert!(!item.insert_text.is_empty(), "insert_text must not be empty");
+            assert!(
+                !item.insert_text.is_empty(),
+                "insert_text must not be empty"
+            );
             assert!(!item.label.is_empty(), "label must not be empty");
             assert_eq!(item.detail, "Emoji shortcode");
         }

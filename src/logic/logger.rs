@@ -505,13 +505,19 @@ mod tests {
     fn smoke_test_log_path_helpers_return_non_empty_paths() {
         // These functions compute deterministic paths and must not panic.
         let root = current_log_root_dir();
-        assert!(!root.as_os_str().is_empty(), "log root dir must not be empty");
+        assert!(
+            !root.as_os_str().is_empty(),
+            "log root dir must not be empty"
+        );
 
         let dir = current_log_dir();
         assert!(!dir.as_os_str().is_empty(), "log dir must not be empty");
 
         let file = current_log_file_for_today();
-        assert!(!file.as_os_str().is_empty(), "log file path must not be empty");
+        assert!(
+            !file.as_os_str().is_empty(),
+            "log file path must not be empty"
+        );
 
         // log dir should be a subdirectory of root
         assert!(

@@ -1015,7 +1015,9 @@ fn render_list_item(
 
     if let Some(checked) = task_checked {
         if checked {
-            output.push_str("<li class=\"marco-marco-task-list-item marco-marco-task-list-item--checked\">");
+            output.push_str(
+                "<li class=\"marco-task-list-item marco-task-list-item--checked\">",
+            );
         } else {
             output.push_str("<li class=\"marco-task-list-item\">");
         }

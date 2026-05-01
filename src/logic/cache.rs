@@ -538,7 +538,9 @@ mod tests {
 
         // After invalidation the next load reads the fresh file
         cache.invalidate_file(&path);
-        let refreshed = cache.load_file_fast(&path).expect("load after invalidate failed");
+        let refreshed = cache
+            .load_file_fast(&path)
+            .expect("load after invalidate failed");
         assert!(
             refreshed.contains("updated content"),
             "expected fresh content after invalidate_file"

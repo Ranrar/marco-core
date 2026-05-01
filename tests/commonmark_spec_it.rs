@@ -227,7 +227,8 @@ fn test_extension_fixtures_match_expected_html() {
         }
 
         assert_eq!(
-            report.passed, report.total,
+            report.passed,
+            report.total,
             "{name}: {} of {} examples failed",
             report.total - report.passed,
             report.total

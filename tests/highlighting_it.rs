@@ -121,9 +121,12 @@ fn test_compute_highlights_with_source_adds_slider_markers() {
 
     let source_highlights = compute_highlights_with_source(&doc, source);
 
-    let has_slider = source_highlights
-        .iter()
-        .any(|h| matches!(h.tag, HighlightTag::SliderDeckMarker | HighlightTag::SliderSeparatorHorizontal));
+    let has_slider = source_highlights.iter().any(|h| {
+        matches!(
+            h.tag,
+            HighlightTag::SliderDeckMarker | HighlightTag::SliderSeparatorHorizontal
+        )
+    });
     assert!(
         has_slider,
         "expected slider marker highlights from source scan; got: {source_highlights:?}"
