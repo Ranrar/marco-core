@@ -1,6 +1,8 @@
 //! Integration tests for the cached pipeline re-exported from `lib.rs`:
 //! `ParserCache`, `parse_to_html`, `parse_to_html_cached`.
 
+#![cfg(feature = "cache")]
+
 use marco_core::{parse_to_html, parse_to_html_cached, ParserCache, RenderOptions};
 
 #[test]

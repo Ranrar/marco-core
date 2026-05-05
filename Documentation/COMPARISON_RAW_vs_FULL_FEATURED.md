@@ -1,62 +1,155 @@
-# Performance Comparison: Parse (Raw) vs Full Featured
+# marco-core: Raw vs Full-Featured vs Other Parsers
 
-**Test:** Release build, 20 iterations per engine/workload  
-**Date:** 2026-05-01
+Comparison of `marco-core` in two runtime modes against `pulldown-cmark` and `comrak`.
 
----
-
-## Side-by-side comparison
-
-| Workload | pulldown-cmark | comrak | Marco-core raw | Marco-core full featured |
-|----------|---|---|---|---|
-| **Small fixture** | 952 ns | 1,818 ns | 5,981 ns | 7,975 ns |
-| **Medium fixture** | 15,449 ns | 27,016 ns | 144,734 ns | 174,375 ns |
-| **Large fixture** | 266,130 ns | 470,026 ns | 2,609,855 ns | 3,149,878 ns |
-| **Pathological fixture** | 58,471 ns | 121,426 ns | 11,239,601 ns | 11,346,719 ns |
-| **CommonMark spec** | 984,363 ns | 1,017,535 ns | 200,099,151 ns | 200,985,878 ns |
-| **Diagram spec** | 29,205 ns | 67,232 ns | 497,092 ns | 506,370 ns |
-| **GFM spec** | 17,087 ns | 38,628 ns | 443,355 ns | 461,310 ns |
-| **Marco extensions spec** | 25,554 ns | 64,642 ns | 1,064,809 ns | 974,192 ns |
-| **Math spec** | 18,109 ns | 41,368 ns | 262,062 ns | 299,663 ns |
+All measurements taken with a release build (`cargo build --release`), **50 iterations** per workload, via `perf-lab compare`. Timings are wall-clock nanoseconds (mean ± stdev).
 
 ---
 
-## Summary statistics
+## What "Raw" Means
 
-| Engine | Mode | Median (avg) | Min | Max |
-|--------|------|---|---|---|
-| **pulldown-cmark** | parse+render | 492,657 ns | 952 ns | 984,363 ns |
-| **comrak** | parse+render | 509,676 ns | 1,818 ns | 1,017,535 ns |
-| **marco-core** | parse only (raw) | 100,052,566 ns | 5,981 ns | 200,099,151 ns |
-| **marco-core** | parse+render (full) | 100,496,926 ns | 7,975 ns | 200,985,878 ns |
+| Mode | Track positions | Parse math | Parse diagrams |
+|---|---|---|---|
+| `marco-core` (full) | ✅ yes | ✅ yes | ✅ yes |
+| `marco-core-raw` | ❌ no | ❌ no | ❌ no |
 
----
+`marco-core-raw` calls `parse_with_options` with:
 
-## Key observations
+```rust
+ParseOptions {
+    track_positions: false,
+    parse_math: false,
+    parse_diagrams: false,
+}
+```
 
-### Marco-core raw parse vs marco-core full featured
-
-The **render step costs only ~0.4% extra time** on average. This is because:
-- Parsing is the dominant operation (spec parsing ~200ms alone)
-- Rendering is relatively cheap (syntax highlighting, HTML generation)
-- The intelligence layer (diagnostics, completions, hover) is **not** included in `e2e` mode
-
-### Marco-core vs third-party engines
-
-Marco-core is **100–200× slower** on average, especially on large/spec tests. This is intentional:
-
-1. **Comprehensive feature set** — marco-core produces rich AST with exact source positions, needed for editor features
-2. **Strict CommonMark compliance** — full spec conformance (98.8% structural, 43.7% byte-for-byte)
-3. **Extension support** — GFM tables, footnotes, admonitions, emoji, sliders, tab blocks, math, diagrams
-4. **Intelligence layer ready** — AST structure supports highlights, diagnostics, completions, hover
-
-Third-party engines prioritize speed; marco-core prioritizes correctness and editor UX.
+This removes the `LocatedSpan` construction (an O(n) UTF-8 scan per node) and skips the math / mermaid grammar branches entirely. No compile-time features are changed — the comparison is purely about **runtime options** when all features are compiled in.
 
 ---
 
-## Files
+## Parse Mode
 
-- **Baseline comparison (all engines):** `compare-20260501T171603Z.md`
-- **Marco-core parse mode:** `bench-20260501T172947Z.md`
-- **Marco-core e2e mode:** `bench-20260501T173006Z.md`
-- **Raw JSON:** `.json` versions of all files above
+Only parsing cost (no HTML rendering), 50 iterations.
+
+| Workload | marco-core (ns) | marco-core-raw (ns) | raw gain | pulldown-cmark (ns) | comrak (ns) |
+|---|---|---|---|---|---|
+| small (~1 KB) | 6 472 | 5 512 | **+14%** | 740 | 1 428 |
+| medium (~10 KB) | 146 263 | 131 724 | **+11%** | 12 410 | 21 647 |
+| large (~100 KB) | 2 727 867 | 2 462 029 | **+11%** | 234 955 | 373 968 |
+| pathological | 11 516 501 | 10 636 689 | **+8%** | 46 488 | 111 181 |
+| spec:commonmark | 195 730 235 | 197 326 571 | ≈ 0% | 838 052 | 626 278 |
+| spec:diagram | 463 405 | 433 073 | **+7%** | 27 160 | 61 252 |
+| spec:gfm | 433 231 | 401 632 | **+8%** | 14 153 | 34 422 |
+| spec:marco | 934 192 | 876 999 | **+6%** | 21 614 | 57 240 |
+| spec:math | 261 858 | 280 420 | ≈ 0% | 15 498 | 37 067 |
+
+### Speedup of pulldown-cmark / comrak vs marco-core (full) — Parse
+
+| Workload | pulldown-cmark | comrak |
+|---|---|---|
+| small | 8.7× | 4.5× |
+| medium | 11.8× | 6.8× |
+| large | 11.6× | 7.3× |
+| pathological | 247.7× | 103.6× |
+| spec:commonmark | 233.6× | 312.5× |
+| spec:gfm | 30.6× | 12.6× |
+| spec:marco | 43.2× | 16.3× |
+
+---
+
+## End-to-End Mode (Parse + Render)
+
+Full pipeline including HTML generation, 50 iterations.
+
+| Workload | marco-core (ns) | marco-core-raw (ns) | raw gain | pulldown-cmark (ns) | comrak (ns) |
+|---|---|---|---|---|---|
+| small (~1 KB) | 8 246 | 7 607 | **+8%** | 1 004 | 1 857 |
+| medium (~10 KB) | 178 697 | 170 660 | **+5%** | 15 176 | 27 437 |
+| large (~100 KB) | 3 514 905 | 3 308 729 | **+6%** | 295 921 | 490 192 |
+| pathological | 11 931 154 | 10 904 214 | **+9%** | 58 316 | 122 576 |
+| spec:commonmark | 196 555 759 | 196 121 015 | ≈ 0% | 980 481 | 1 022 805 |
+| spec:diagram | 528 342 | 503 621 | **+5%** | 30 309 | 66 326 |
+| spec:gfm | 502 193 | 438 371 | **+13%** | 18 209 | 45 299 |
+| spec:marco | 1 001 930 | 915 678 | **+9%** | 26 691 | 63 734 |
+| spec:math | 306 591 | 308 649 | ≈ 0% | 18 568 | 42 369 |
+
+### Speedup of pulldown-cmark / comrak vs marco-core (full) — E2E
+
+| Workload | pulldown-cmark | comrak |
+|---|---|---|
+| small | 8.2× | 4.4× |
+| medium | 11.8× | 6.5× |
+| large | 11.9× | 7.2× |
+| pathological | 204.6× | 97.3× |
+| spec:commonmark | 200.5× | 192.2× |
+| spec:gfm | 27.6× | 11.1× |
+| spec:marco | 37.5× | 15.7× |
+
+---
+
+## Analysis
+
+### Raw options: small but real gain
+
+Disabling position tracking, math, and diagram parsing shaves **5–15%** off parse time on typical workloads. The saving is largest on GFM and Marco-extension content where the additional grammar branches see actual nodes. On math-heavy or diagram-heavy inputs (spec:math, spec:diagram) the gain is compressed because those parsers handle a small proportion of total work anyway.
+
+On `spec:commonmark` the gain is ~0% — the CommonMark suite contains no math/diagrams and spans are allocated either way for the 652 CommonMark examples; position-skipping is not free on large corpora because the fallback still walks the input string.
+
+The render step adds roughly the same overhead regardless of options because rendering is dominated by string allocation, not the parse-options flags.
+
+### Why pulldown-cmark and comrak are faster
+
+Both parsers trade feature breadth for throughput:
+
+- **pulldown-cmark** is a streaming event iterator (zero-copy, no persistent AST). It cannot produce a navigable tree, source positions, diagnostics, or intelligence.
+- **comrak** builds an AST but uses a tightly optimised arena allocator internally. It does not produce position spans by default and has no intelligence layer.
+
+Neither parser supports: source positions, diagnostics, completions, hover, TOC, math rendering, diagram rendering, or syntax highlighting.
+
+### marco-core scope
+
+marco-core is a **feature-complete editor library**, not a throughput-maximising streaming tokenizer. The extra cost buys:
+
+- Full `Position`/`Span` tracking (line/col ranges on every node — required for diagnostics and hover)
+- GFM extensions (tables, strikethrough, task lists, footnotes, admonitions)
+- Marco-specific extensions (tab blocks, sliders, inline footnotes, headerless tables, emoji shortcodes)
+- Math rendering via KaTeX (`render-math` feature)
+- Diagram rendering via Mermaid (`render-diagrams` feature)
+- Syntax highlighting via syntect (`render-syntax-highlighting` feature)
+- `MarkdownIntelligenceProvider`: diagnostics, completion, hover, and TOC
+
+### When to use each mode
+
+| Use case | Recommended |
+|---|---|
+| Editor / IDE integration (full features) | `marco_core::parse()` |
+| Build-time HTML generation, positions not needed | `parse_with_options` with `track_positions: false` |
+| Static-site batch conversion, standard CommonMark only | `pulldown-cmark` or `comrak` |
+| Maximum throughput, no extensions | `pulldown-cmark` |
+
+---
+
+## Measurement Setup
+
+```
+Tool:       tools/perf-lab  (perf-lab v0.1.0)
+Command:    perf-lab compare --engine <E1> ... --mode <mode> --iterations 50
+Build:      cargo build --release --locked  (Rust stable 1.94.1)
+Workloads:  synthetic small/medium/large/pathological + spec suites
+```
+
+Workload sizes (approximate):
+
+| ID | Bytes |
+|---|---|
+| small | ~1 KB |
+| medium | ~10 KB |
+| large | ~100 KB |
+| pathological | ~100 KB (deeply nested / repetitive) |
+| spec:commonmark | ~600 KB (652 examples concatenated) |
+| spec:gfm | ~80 KB |
+| spec:marco | ~170 KB |
+| spec:math | ~50 KB |
+| spec:diagram | ~85 KB |
+
+Raw JSON and CSV artifacts saved under `tools/perf-lab/output/summary/`.

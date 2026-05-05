@@ -3,7 +3,7 @@
 //! Parses emphasis (*text* or _text_) and converts them to Emphasis nodes.
 //! Emphasis nodes contain children that are recursively parsed inline elements.
 
-use super::shared::{to_parser_span_range, GrammarSpan};
+use super::shared::{opt_span_range, GrammarSpan};
 use crate::grammar::inlines as grammar;
 use crate::parser::ast::{Node, NodeKind};
 use nom::IResult;
@@ -24,7 +24,7 @@ pub fn parse_emphasis(input: GrammarSpan) -> IResult<GrammarSpan, Node> {
     let (rest, content) = grammar::emphasis(input)?;
 
     // Create span for the full emphasis (including delimiters)
-    let span = to_parser_span_range(start, rest);
+    let span = opt_span_range(start, rest);
 
     // Recursively parse inline elements within emphasis text
     // Parse inline content within emphasis preserving position
@@ -38,7 +38,7 @@ pub fn parse_emphasis(input: GrammarSpan) -> IResult<GrammarSpan, Node> {
 
     let node = Node {
         kind: NodeKind::Emphasis,
-        span: Some(span),
+        span,
         children,
     };
 

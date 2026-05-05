@@ -6,13 +6,20 @@
 //! - `editor`: highlighting, hover, completion
 //! - `lsp_protocol`: optional protocol adapter surface
 
+#[cfg(feature = "intelligence-diagnostics")]
 pub mod analysis;
 pub mod catalog;
+#[cfg(any(
+    feature = "intelligence-highlights",
+    feature = "intelligence-completions",
+    feature = "intelligence-hover"
+))]
 pub mod editor;
 pub mod lsp_protocol;
 pub mod markdown;
 pub mod toc;
 
+#[cfg(feature = "intelligence-diagnostics")]
 pub use analysis::{
     compute_diagnostics, compute_diagnostics_critical, compute_diagnostics_with_options,
     compute_lints, compute_lints_detailed, compute_lints_detailed_with_options,
@@ -26,12 +33,16 @@ pub use catalog::{
     DiagnosticsCatalogEntry, DiagnosticsCatalogGroup, DiagnosticsCatalogSettings,
     MarkdownFeatureCoverage,
 };
-pub use editor::{
-    compute_highlights, compute_highlights_with_source, get_hover_info, get_markdown_completions,
-    get_position_span, CompletionItem, Highlight, HighlightTag, HoverInfo,
-};
+#[cfg(feature = "intelligence-highlights")]
+pub use editor::{compute_highlights, compute_highlights_with_source, Highlight, HighlightTag};
+#[cfg(feature = "intelligence-completions")]
+pub use editor::{get_markdown_completions, CompletionItem};
+#[cfg(feature = "intelligence-hover")]
+pub use editor::{get_hover_info, get_position_span, HoverInfo};
 
-use crate::parser::{Document, Position};
+#[cfg(feature = "intelligence-hover")]
+use crate::parser::Position;
+use crate::parser::Document;
 
 /// In-process provider for editor intelligence features.
 #[derive(Default)]
@@ -52,6 +63,7 @@ impl MarkdownIntelligenceProvider {
     }
 
     /// Compute semantic highlights for the current document using source-aware markers.
+    #[cfg(feature = "intelligence-highlights")]
     pub fn highlights(&self, source: &str) -> Vec<Highlight> {
         self.document
             .as_ref()
@@ -60,6 +72,7 @@ impl MarkdownIntelligenceProvider {
     }
 
     /// Compute diagnostics for the current document.
+    #[cfg(feature = "intelligence-diagnostics")]
     pub fn diagnostics(&self) -> Vec<Diagnostic> {
         self.document
             .as_ref()
@@ -68,6 +81,7 @@ impl MarkdownIntelligenceProvider {
     }
 
     /// Compute diagnostics for the current document using custom options.
+    #[cfg(feature = "intelligence-diagnostics")]
     pub fn diagnostics_with_options(&self, options: DiagnosticsOptions) -> Vec<Diagnostic> {
         self.document
             .as_ref()
@@ -76,6 +90,7 @@ impl MarkdownIntelligenceProvider {
     }
 
     /// Resolve hover information for a source position.
+    #[cfg(feature = "intelligence-hover")]
     pub fn hover(&self, position: Position) -> Option<HoverInfo> {
         self.document
             .as_ref()
@@ -83,6 +98,7 @@ impl MarkdownIntelligenceProvider {
     }
 
     /// Get completion candidates for a query.
+    #[cfg(feature = "intelligence-completions")]
     pub fn completions(&self, query: &str) -> Vec<CompletionItem> {
         get_markdown_completions(query)
     }

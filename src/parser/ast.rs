@@ -42,7 +42,16 @@ impl ReferenceMap {
 /// - Collapse consecutive whitespace to single space
 /// - Trim leading/trailing whitespace
 fn normalize_label(label: &str) -> String {
-    let collapsed = label.split_whitespace().collect::<Vec<_>>().join(" ");
+    // Build a whitespace-collapsed string directly without allocating a Vec.
+    let mut collapsed = String::with_capacity(label.len());
+    let mut first = true;
+    for word in label.split_whitespace() {
+        if !first {
+            collapsed.push(' ');
+        }
+        collapsed.push_str(word);
+        first = false;
+    }
 
     // NOTE:
     // Rust doesn't provide full Unicode case-folding in std. We apply

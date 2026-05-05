@@ -30,7 +30,12 @@ pub fn descriptors() -> Vec<EngineDescriptor> {
         EngineDescriptor {
             id: "marco-core",
             implemented: true,
-            notes: "native in-process adapter",
+            notes: "native in-process adapter (full features)",
+        },
+        EngineDescriptor {
+            id: "marco-core-raw",
+            implemented: true,
+            notes: "marco-core with track_positions=false, parse_math=false, parse_diagrams=false",
         },
         EngineDescriptor {
             id: "pulldown-cmark",
@@ -58,6 +63,7 @@ pub fn descriptors() -> Vec<EngineDescriptor> {
 pub fn get_adapter(engine: &str) -> Result<Box<dyn EngineAdapter>, String> {
     match engine {
         "marco-core" => Ok(Box::new(marco_core::MarcoCoreAdapter::default())),
+        "marco-core-raw" => Ok(Box::new(marco_core::MarcoCoreRawAdapter::default())),
         "pulldown-cmark" => Ok(Box::new(pulldown_cmark::PulldownCmarkAdapter)),
         "comrak" => Ok(Box::new(comrak::ComrakAdapter)),
         "markdown-rs" => Ok(Box::new(markdown_rs::MarkdownRsAdapter)),

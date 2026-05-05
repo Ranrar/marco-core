@@ -1,7 +1,10 @@
 use super::code_languages::language_display_label;
+#[cfg(feature = "render-diagrams")]
 use super::diagram::render_mermaid_diagram;
+#[cfg(feature = "render-math")]
 use super::math::{render_display_math, render_inline_math};
 use super::plarform_mentions;
+#[cfg(feature = "render-syntax-highlighting")]
 use super::syntect_highlighter::highlight_code_to_classed_html;
 use super::RenderOptions;
 use crate::parser::{AdmonitionKind, AdmonitionStyle, Document, Node, NodeKind};
@@ -32,6 +35,7 @@ struct RenderContext<'a> {
     footnote_ref_counts: HashMap<String, usize>,
     tab_group_counter: usize,
     slider_deck_counter: usize,
+    #[cfg(feature = "render-diagrams")]
     mermaid_result_cache: HashMap<(String, String), Result<String, String>>,
     /// Tracks how many times each slug base has been used so duplicates get
     /// a `-1`, `-2`, … suffix — matching the same logic in `intelligence::toc`.
@@ -45,7 +49,10 @@ pub fn render_html(
 ) -> Result<String, Box<dyn std::error::Error>> {
     log::debug!("Rendering {} nodes to HTML", document.len());
 
-    let mut html = String::new();
+    // Estimate output size: typical HTML is ~1.5–2× the AST node count × avg node bytes.
+    // Seeding with a modest non-zero capacity avoids the first few reallocations for free.
+    let estimated = document.children.len() * 64;
+    let mut html = String::with_capacity(estimated.max(256));
 
     let mut ctx = RenderContext::default();
     for node in &document.children {
@@ -73,7 +80,9 @@ pub fn render_html(
                 continue;
             };
 
-            html.push_str(&format!("<li id=\"fn{}\">", n));
+            html.push_str("<li id=\"fn");
+            html.push_str(&n.to_string());
+            html.push_str("\">" );
             for child in &def_node.children {
                 render_node(child, &mut html, options, &mut ctx)?;
             }
@@ -127,21 +136,25 @@ fn render_node(
                 slug
             };
 
+            // level is 1–6; render digit as char to avoid a heap allocation.
+            let level_char = char::from_digit(*level as u32, 10).unwrap_or('1');
+            let escaped_id = escape_html(&effective_id);
+
             output.push_str("<h");
-            output.push_str(&level.to_string());
+            output.push(level_char);
             output.push_str(" id=\"");
-            output.push_str(&escape_html(&effective_id));
+            output.push_str(&escaped_id);
             output.push_str("\">");
 
             // Wrap heading text in a self-anchor so the whole heading is clickable.
             output.push_str("<a class=\"marco-heading-anchor\" href=\"#");
-            output.push_str(&escape_html(&effective_id));
+            output.push_str(&escaped_id);
             output.push_str("\" aria-label=\"Link to this heading\">");
             output.push_str(&escaped_text);
             output.push_str("</a>");
 
             output.push_str("</h");
-            output.push_str(&level.to_string());
+            output.push(level_char);
             output.push_str(">\n");
         }
         NodeKind::Paragraph => {
@@ -175,13 +188,16 @@ fn render_node(
 
             // Add language class attribute if language specified
             if let Some(lang) = language_raw {
-                output.push_str(&format!(" class=\"language-{}\"", escape_html(lang)));
+                output.push_str(" class=\"language-");
+                output.push_str(&escape_html(lang));
+                output.push('"');
             }
 
             output.push('>');
 
             // Optional syntax highlighting. If syntect can't resolve the language,
             // fall back to plain escaped code.
+            #[cfg(feature = "render-syntax-highlighting")]
             if options.syntax_highlighting {
                 if let Some(lang) = language_raw {
                     if let Some(highlighted) = highlight_code_to_classed_html(code, lang) {
@@ -541,6 +557,7 @@ fn render_node(
         }
         NodeKind::InlineMath { content } => {
             // Render inline math using katex-rs
+            #[cfg(feature = "render-math")]
             match render_inline_math(content) {
                 Ok(html) => output.push_str(&html),
                 Err(e) => {
@@ -551,9 +568,16 @@ fn render_node(
                     output.push_str("</code>");
                 }
             }
+            #[cfg(not(feature = "render-math"))]
+            {
+                output.push_str("<code class=\"math\">");
+                output.push_str(&escape_html(content));
+                output.push_str("</code>");
+            }
         }
         NodeKind::DisplayMath { content } => {
             // Render display math using katex-rs
+            #[cfg(feature = "render-math")]
             match render_display_math(content) {
                 Ok(html) => output.push_str(&html),
                 Err(e) => {
@@ -564,9 +588,17 @@ fn render_node(
                     output.push_str("</pre>");
                 }
             }
+            #[cfg(not(feature = "render-math"))]
+            {
+                output.push_str("<pre class=\"math\"><code>");
+                output.push_str(&escape_html(content));
+                output.push_str("</code></pre>\n");
+            }
         }
         NodeKind::MermaidDiagram { content } => {
             // Render Mermaid diagram using mermaid-rs-renderer with per-render-pass caching.
+            #[cfg(feature = "render-diagrams")]
+            {
             let cache_key = (options.theme.clone(), content.clone());
             let rendered = if let Some(cached) = ctx.mermaid_result_cache.get(&cache_key) {
                 cached.clone()
@@ -602,6 +634,13 @@ fn render_node(
                     output.push_str(&escape_html(content));
                     output.push_str("</code></pre>\n");
                 }
+            }
+            }
+            #[cfg(not(feature = "render-diagrams"))]
+            {
+                output.push_str("<pre class=\"mermaid\"><code>");
+                output.push_str(&escape_html(content));
+                output.push_str("</code></pre>\n");
             }
         }
     }

@@ -27,14 +27,19 @@ pub mod render;
 
 /// Main intelligence provider used by downstream editor integrations.
 pub use intelligence::MarkdownIntelligenceProvider;
-/// Parse Markdown text into a [`Document`] AST.
+/// Parse Markdown text into a [`Document`] AST using default options.
 pub use parser::parse;
+/// Runtime parse configuration; pass to [`parse_with_options`] to skip expensive work.
+pub use parser::ParseOptions;
+/// Parse Markdown with explicit runtime options (position tracking, math, diagrams).
+pub use parser::parse_with_options;
 /// Core AST types used by parser, renderer, and intelligence modules.
 pub use parser::{Document, Node, NodeKind};
 /// Render a parsed [`Document`] into HTML using [`RenderOptions`].
 pub use render::{render, RenderOptions};
 
 /// Convenience cache-backed parsing/rendering APIs and cache type.
+#[cfg(feature = "cache")]
 pub use logic::cache::{parse_to_html, parse_to_html_cached, ParserCache};
 /// UTF-8 sanitization API and related types.
 pub use logic::utf8::{sanitize_input, sanitize_input_with_stats, InputSource, SanitizeStats};

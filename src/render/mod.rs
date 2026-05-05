@@ -8,10 +8,12 @@ pub mod base_css;
 /// Language normalization and metadata for code blocks.
 pub mod code_languages;
 /// Diagram rendering helpers (for example Mermaid).
+#[cfg(feature = "render-diagrams")]
 pub mod diagram;
 /// Core Markdown AST to HTML renderer.
 pub mod markdown;
 /// Math rendering helpers.
+#[cfg(feature = "render-math")]
 pub mod math;
 /// Public render configuration options.
 pub mod options;
@@ -20,6 +22,7 @@ pub mod plarform_mentions;
 /// HTML document wrappers for preview pages.
 pub mod preview_document;
 /// Syntax highlighting support based on syntect.
+#[cfg(feature = "render-syntax-highlighting")]
 pub mod syntect_highlighter;
 
 /// Re-export code language helpers.
@@ -31,6 +34,7 @@ pub use options::*;
 /// Re-export preview document helpers.
 pub use preview_document::*;
 /// Re-export syntax highlighter helpers.
+#[cfg(feature = "render-syntax-highlighting")]
 pub use syntect_highlighter::*;
 
 use crate::parser::Document;

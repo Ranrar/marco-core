@@ -750,7 +750,7 @@ fn parse_extended_definition_list<'a>(
                 log::warn!("Failed to parse inline elements in definition term: {}", e);
                 vec![Node {
                     kind: NodeKind::Text(term_taken_span.fragment().to_string()),
-                    span: Some(crate::parser::shared::to_parser_span(term_taken_span)),
+                    span: crate::parser::shared::opt_span(term_taken_span),
                     children: Vec::new(),
                 }]
             }
@@ -758,10 +758,7 @@ fn parse_extended_definition_list<'a>(
 
         children.push(Node {
             kind: NodeKind::DefinitionTerm,
-            span: Some(crate::parser::shared::to_parser_span_range(
-                term_start_span,
-                term_after_span,
-            )),
+            span: crate::parser::shared::opt_span_range(term_start_span, term_after_span),
             children: term_children,
         });
 
@@ -848,10 +845,7 @@ fn parse_extended_definition_list<'a>(
             let dd_end_span = input.take_from(def_block_end);
             children.push(Node {
                 kind: NodeKind::DefinitionDescription,
-                span: Some(crate::parser::shared::to_parser_span_range(
-                    dd_start_span,
-                    dd_end_span,
-                )),
+                span: crate::parser::shared::opt_span_range(dd_start_span, dd_end_span),
                 children: def_children,
             });
 
@@ -883,12 +877,12 @@ fn parse_extended_definition_list<'a>(
     }
 
     let (rest, _taken) = input.take_split(cursor);
-    let span = crate::parser::shared::to_parser_span_range(input, rest);
+    let span = crate::parser::shared::opt_span_range(input, rest);
     Some((
         rest,
         Node {
             kind: NodeKind::DefinitionList,
-            span: Some(span),
+            span,
             children,
         },
     ))

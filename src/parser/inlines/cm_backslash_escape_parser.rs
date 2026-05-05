@@ -3,7 +3,7 @@
 //! Parses backslash escape sequences (\*, \\, etc.) and converts them to Text nodes
 //! containing just the escaped character (without the backslash).
 
-use super::shared::{to_parser_span_range, GrammarSpan};
+use super::shared::{opt_span_range, GrammarSpan};
 use crate::grammar::inlines as grammar;
 use crate::parser::ast::{Node, NodeKind};
 use nom::IResult;
@@ -22,12 +22,12 @@ use nom::IResult;
 pub fn parse_backslash_escape(input: GrammarSpan) -> IResult<GrammarSpan, Node> {
     let (rest, escaped_char) = grammar::backslash_escape(input)?;
 
-    let span = to_parser_span_range(input, rest);
+    let span = opt_span_range(input, rest);
 
     // Create a text node with just the escaped character (without the backslash)
     let node = Node {
         kind: NodeKind::Text(escaped_char.to_string()),
-        span: Some(span),
+        span,
         children: Vec::new(),
     };
 

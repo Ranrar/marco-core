@@ -1,3 +1,4 @@
+#![cfg(feature = "intelligence-highlights")]
 use marco_core::intelligence::{compute_highlights, compute_highlights_with_source, HighlightTag};
 use marco_core::parser::{Document, Node, NodeKind, Position, Span};
 

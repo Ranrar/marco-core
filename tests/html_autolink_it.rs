@@ -1,3 +1,4 @@
+#![cfg(feature = "intelligence-highlights")]
 use marco_core::intelligence::{compute_highlights, HighlightTag};
 /// Integration test to verify HTML tags are not parsed as autolinks.
 /// This test validates the fix for the issue where HTML tags like <img> and <span>

@@ -3,7 +3,7 @@
 //! Parses inline links (`[text](url "title")`) and converts them to Link nodes.
 //! Link nodes contain URL, optional title, and recursively parsed inline children.
 
-use super::shared::{to_parser_span, GrammarSpan};
+use super::shared::{opt_span, GrammarSpan};
 use crate::grammar::inlines as grammar;
 use crate::parser::ast::{Node, NodeKind};
 use nom::IResult;
@@ -22,7 +22,7 @@ use nom::IResult;
 pub fn parse_link(input: GrammarSpan) -> IResult<GrammarSpan, Node> {
     let (rest, (link_text, url, title)) = grammar::link(input)?;
 
-    let span = to_parser_span(link_text);
+    let span = opt_span(link_text);
 
     // Parse inline content within link text preserving position
     // Use the span directly instead of fragment() to maintain position context
@@ -39,7 +39,7 @@ pub fn parse_link(input: GrammarSpan) -> IResult<GrammarSpan, Node> {
             url: url.fragment().to_string(),
             title: title.map(|s| s.fragment().to_string()),
         },
-        span: Some(span),
+        span,
         children,
     };
 

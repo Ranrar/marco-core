@@ -3,7 +3,7 @@
 //! Parses strong emphasis (**text** or __text__) and converts them to Strong nodes.
 //! Strong nodes contain children that are recursively parsed inline elements.
 
-use super::shared::{to_parser_span_range, GrammarSpan};
+use super::shared::{opt_span_range, GrammarSpan};
 use crate::grammar::inlines as grammar;
 use crate::parser::ast::{Node, NodeKind};
 use nom::IResult;
@@ -24,7 +24,7 @@ pub fn parse_strong(input: GrammarSpan) -> IResult<GrammarSpan, Node> {
     let (rest, content) = grammar::strong(input)?;
 
     // Create span for the full strong (including delimiters)
-    let span = to_parser_span_range(start, rest);
+    let span = opt_span_range(start, rest);
 
     // Recursively parse inline elements within strong text preserving position
     let children = match crate::parser::inlines::parse_inlines_from_span(content) {
@@ -37,7 +37,7 @@ pub fn parse_strong(input: GrammarSpan) -> IResult<GrammarSpan, Node> {
 
     let node = Node {
         kind: NodeKind::Strong,
-        span: Some(span),
+        span,
         children,
     };
 

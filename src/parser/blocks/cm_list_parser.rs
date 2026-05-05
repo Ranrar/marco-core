@@ -3,7 +3,7 @@
 //! Handles conversion of lists (both ordered and unordered) from grammar layer to parser AST,
 //! including tight/loose determination, item content dedenting, and recursive block parsing.
 
-use super::shared::{dedent_list_item_content, to_parser_span, to_parser_span_range, GrammarSpan};
+use super::shared::{dedent_list_item_content, opt_span, opt_span_range, GrammarSpan};
 use crate::grammar::blocks::cm_list::ListMarker;
 use crate::parser::ast::{Document, Node, NodeKind};
 use nom::Input;
@@ -76,7 +76,7 @@ where
     // Create list node
     let list_start = items[0].1;
     let list_end = items.last().unwrap().1;
-    let list_span = to_parser_span_range(list_start, list_end);
+    let list_span = opt_span_range(list_start, list_end);
 
     let mut list_node = Node {
         kind: NodeKind::List {
@@ -84,13 +84,13 @@ where
             start,
             tight: is_tight,
         },
-        span: Some(list_span),
+        span: list_span,
         children: Vec::new(),
     };
 
     // Parse each item's content recursively
     for (_marker, content, _has_blank_in, _has_blank_before, content_indent) in items {
-        let item_span = to_parser_span(content);
+        let item_span = opt_span(content);
 
         // Dedent the list item content before parsing
         // This allows block structures (blockquotes, code blocks, nested lists) to be recognized
@@ -123,7 +123,7 @@ where
         if let Some((checked, marker_span)) = task {
             item_children.push(Node {
                 kind: NodeKind::TaskCheckbox { checked },
-                span: Some(marker_span),
+                span: marker_span,
                 children: Vec::new(),
             });
         }
@@ -132,7 +132,7 @@ where
 
         let item_node = Node {
             kind: NodeKind::ListItem,
-            span: Some(item_span),
+            span: item_span,
             children: item_children,
         };
 
@@ -149,7 +149,7 @@ where
 fn detect_task_checkbox_in_list_item(
     content: GrammarSpan,
     content_indent: usize,
-) -> Option<(bool, crate::parser::position::Span, String)> {
+) -> Option<(bool, Option<crate::parser::position::Span>, String)> {
     // Fast path: if there's no marker in the dedented string, bail early.
     // This keeps behaviour identical for non-task items.
     let dedented = dedent_list_item_content(content.fragment(), content_indent);
@@ -215,7 +215,7 @@ fn detect_task_checkbox_in_list_item(
     // canonical exclusive version from `parser::shared`.
     let marker_start = after_prefix.take_from(i);
     let (after_marker, _marker_taken) = marker_start.take_split(3);
-    let marker_span = crate::parser::shared::to_parser_span_range(marker_start, after_marker);
+    let marker_span = crate::parser::shared::opt_span_range(marker_start, after_marker);
 
     Some((checked, marker_span, dedented_rest.to_string()))
 }

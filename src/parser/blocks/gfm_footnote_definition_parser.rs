@@ -124,7 +124,7 @@ pub fn parse_footnote_definition(input: GrammarSpan) -> Option<(GrammarSpan, Nod
     // byte of `rest`, not at the end of the entire remaining document.
     // `blocks::shared::to_parser_span_range` is aliased to the *inclusive*
     // variant; `crate::parser::shared::to_parser_span_range` is exclusive.
-    let span = crate::parser::shared::to_parser_span_range(input, rest);
+    let span = crate::parser::shared::opt_span_range(input, rest);
 
     // Parse the definition content as paragraph-like blocks.
     // NOTE: We keep this conservative for now: a single paragraph with inline parsing.
@@ -147,7 +147,7 @@ pub fn parse_footnote_definition(input: GrammarSpan) -> Option<(GrammarSpan, Nod
         kind: NodeKind::FootnoteDefinition {
             label: label.to_string(),
         },
-        span: Some(span),
+        span,
         children: vec![paragraph],
     };
 

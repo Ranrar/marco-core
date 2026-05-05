@@ -3,7 +3,7 @@
 //! Parses plain text segments when no inline elements match. Handles special
 //! cases like trailing spaces before newlines and consecutive backticks.
 
-use super::shared::{to_parser_span, GrammarSpan};
+use super::shared::{opt_span, GrammarSpan};
 use crate::parser::ast::{Node, NodeKind};
 use nom::bytes::complete::take;
 use nom::IResult;
@@ -150,11 +150,11 @@ pub fn parse_text(input: GrammarSpan) -> IResult<GrammarSpan, Node> {
     let text_content = input.take(text_len);
     let rest = input.take_from(text_len);
 
-    let span = to_parser_span(text_content);
+    let span = opt_span(text_content);
 
     let node = Node {
         kind: NodeKind::Text(text_content.fragment().to_string()),
-        span: Some(span),
+        span,
         children: Vec::new(),
     };
 
@@ -198,11 +198,11 @@ pub fn parse_special_as_text(input: GrammarSpan) -> IResult<GrammarSpan, Node> {
 
     let (rest, text_content) = take(char_len).parse(input)?;
 
-    let span = to_parser_span(text_content);
+    let span = opt_span(text_content);
 
     let node = Node {
         kind: NodeKind::Text(text_content.fragment().to_string()),
-        span: Some(span),
+        span,
         children: Vec::new(),
     };
 

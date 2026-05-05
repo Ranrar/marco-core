@@ -1,6 +1,13 @@
 //! Integration tests for the `MarkdownIntelligenceProvider` facade
 //! re-exported from `lib.rs`.
 
+#![cfg(all(
+    feature = "intelligence-highlights",
+    feature = "intelligence-diagnostics",
+    feature = "intelligence-completions",
+    feature = "intelligence-hover"
+))]
+
 use marco_core::{parse, MarkdownIntelligenceProvider};
 
 #[test]

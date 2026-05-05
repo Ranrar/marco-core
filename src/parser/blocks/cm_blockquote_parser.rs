@@ -3,7 +3,7 @@
 //! Handles conversion of blockquotes (> prefixed lines) from grammar layer to parser AST,
 //! including recursive block parsing and lazy continuation line handling.
 
-use super::shared::{to_parser_span, GrammarSpan};
+use super::shared::{opt_span, GrammarSpan};
 use crate::parser::ast::{Document, Node, NodeKind};
 
 /// Parse a blockquote into an AST node with recursive block parsing.
@@ -37,7 +37,7 @@ pub fn parse_blockquote<F>(
 where
     F: FnOnce(&str, usize) -> Result<Document, Box<dyn std::error::Error>>,
 {
-    let span = to_parser_span(content);
+    let span = opt_span(content);
 
     // Extract the block quote content (remove leading > markers)
     // CRITICAL: Per CommonMark spec, "The setext heading underline cannot be a lazy continuation line"
@@ -86,7 +86,7 @@ where
 
     Ok(Node {
         kind: NodeKind::Blockquote,
-        span: Some(span),
+        span,
         children: inner_doc.children, // Use parsed children
     })
 }

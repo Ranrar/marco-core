@@ -6,7 +6,7 @@
 //!
 //! Each slide's raw markdown is recursively parsed as block nodes.
 
-use super::shared::{to_parser_span, to_parser_span_range, GrammarSpan};
+use super::shared::{opt_span, opt_span_range, GrammarSpan};
 use crate::grammar::blocks::marco_sliders::MarcoSlideDeck;
 use crate::parser::ast::{Document, Node, NodeKind};
 
@@ -27,13 +27,13 @@ pub fn parse_marco_slide_deck<F>(
 where
     F: FnMut(&str, usize) -> Result<Document, Box<dyn std::error::Error>>,
 {
-    let deck_span = to_parser_span_range(full_start, full_end);
+    let deck_span = opt_span_range(full_start, full_end);
 
     let mut root = Node {
         kind: NodeKind::SliderDeck {
             timer_seconds: deck.timer_seconds,
         },
-        span: Some(deck_span),
+        span: deck_span,
         children: Vec::new(),
     };
 
@@ -53,7 +53,7 @@ where
                 vertical: slide.vertical,
             },
             // The grammar currently only provides a precise span for the slide body.
-            span: Some(to_parser_span(slide.content)),
+            span: opt_span(slide.content),
             children: slide_doc.children,
         });
     }

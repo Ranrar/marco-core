@@ -11,7 +11,7 @@
 //! - The content is parsed as inline Markdown (no multi-paragraph support).
 //! - This parser is intentionally conservative and does not span newlines.
 
-use super::shared::{to_parser_span, GrammarSpan};
+use super::shared::{opt_span, GrammarSpan};
 use crate::parser::ast::{Node, NodeKind};
 use nom::IResult;
 use nom::Input;
@@ -88,7 +88,7 @@ pub fn parse_inline_footnote(input: GrammarSpan) -> IResult<GrammarSpan, (Node, 
                 kind: NodeKind::FootnoteReference {
                     label: label.clone(),
                 },
-                span: Some(to_parser_span(taken)),
+                span: opt_span(taken),
                 children: Vec::new(),
             };
 

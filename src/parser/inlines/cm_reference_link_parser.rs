@@ -3,7 +3,7 @@
 //! Resolution against `[label]: url` definitions happens in a later pass
 //! (see `core/src/parser/mod.rs`).
 
-use super::shared::{to_parser_span, GrammarSpan};
+use super::shared::{opt_span, GrammarSpan};
 use crate::parser::ast::{Node, NodeKind};
 use nom::IResult;
 use nom::Input;
@@ -212,12 +212,12 @@ pub fn parse_reference_link(input: GrammarSpan) -> IResult<GrammarSpan, Node> {
         )));
     }
 
-    let span = to_parser_span(link_text);
+    let span = opt_span(link_text);
     let rest = start_input.take_from(consumed_len);
 
     let node = Node {
         kind: NodeKind::LinkReference { label, suffix },
-        span: Some(span),
+        span,
         children,
     };
 

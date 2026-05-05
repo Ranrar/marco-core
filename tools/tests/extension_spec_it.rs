@@ -95,6 +95,7 @@ fn run_fixture_suite(name: &str, json: &str) {
 }
 
 #[test]
+#[cfg(feature = "render-diagrams")]
 fn test_diagram_fixtures_match_expected_html() {
     run_fixture_suite("diagram", include_str!("../spec/diagram.json"));
 }
@@ -110,6 +111,7 @@ fn test_marco_fixtures_match_expected_html() {
 }
 
 #[test]
+#[cfg(feature = "render-math")]
 fn test_math_fixtures_match_expected_html() {
     run_fixture_suite("math", include_str!("../spec/math.json"));
 }

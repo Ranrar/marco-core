@@ -9,6 +9,47 @@ Version scheme note: `marco-core` and `marco-shared` follow independent semver f
 
 ### Added
 
+#### `ParseOptions` and `parse_with_options` — runtime parser control
+
+New public API that lets callers tune parse behaviour per-call without changing
+compile-time features:
+
+| Option | Default | Effect when `false` |
+|---|---|---|
+| `track_positions` | `true` | Skips O(n) span construction; nodes carry `span: None` |
+| `parse_math` | `true` | Skips display-math and inline-math grammar branches |
+| `parse_diagrams` | `true` | Skips mermaid fenced-code-block detection |
+
+`parse_with_options(input, opts)` installs a `ParseOptionsGuard` that restores
+the previous per-thread values on return or panic (RAII, thread-local).
+`parse(input)` is unchanged and continues to enable all options.
+
+#### Compile-time feature flags — nine optional feature gates
+
+`Cargo.toml` now declares a `[features]` table with nine flags, all on by default:
+
+| Feature | Gates |
+|---|---|
+| `render-math` | KaTeX math rendering (`dep:katex-rs`) |
+| `render-diagrams` | Mermaid diagram rendering (`dep:mermaid-rs-renderer`) |
+| `render-syntax-highlighting` | syntect code highlighting (`dep:syntect`) |
+| `cache` | `ParserCache`, `parse_to_html`, `parse_to_html_cached` (`dep:moka`) |
+| `file-logger` | `SimpleFileLogger`, log rotation, log-path helpers |
+| `intelligence-highlights` | `MarkdownIntelligenceProvider::highlights` (implies `render-syntax-highlighting`) |
+| `intelligence-diagnostics` | `::diagnostics` and the analysis sub-module |
+| `intelligence-completions` | `::completions` |
+| `intelligence-hover` | `::hover` and `::get_position_span` |
+
+Building with `--no-default-features` produces a minimal parser + renderer with
+no optional dependencies. All 26 test suites pass in both configurations.
+Test files that exercise optional APIs are gated with `#![cfg(feature = "...")]`.
+
+#### `marco-core-raw` perf-lab engine adapter
+
+A new `"marco-core-raw"` engine for `perf-lab compare` calls `parse_with_options`
+with all three cost-saving options disabled, making it easy to measure the
+runtime overhead of each opt-in feature in isolation.
+
 #### `tools/perf-lab` — performance and regression benchmarking crate
 A standalone `publish = false` Rust crate under `tools/perf-lab/` that provides
 direct-timing benchmarks, stress testing, cross-engine comparison, artifact
@@ -63,6 +104,50 @@ Integration test for Marco-specific extension spec fixtures (loaded from
 | `Documentation/COMPARISON_RAW_vs_FULL_FEATURED.md` | Benchmark comparison: marco-core vs pulldown-cmark vs comrak |
 
 ### Changed
+
+#### Parser and renderer — targeted performance improvements
+
+Five changes that reduce parse+render latency by **10–37%** on typical workloads
+with no API or feature changes:
+
+1. **`to_parser_span` — single-pass newline scan** (`src/parser/shared.rs`)
+   Replaced two separate O(n) passes (`matches('\n').count()` + `rfind('\n')`)
+   with a single byte-scan loop that computes `newline_count` and `last_nl` together.
+
+2. **Inline loop — first-byte fast-path** (`src/parser/inlines/mod.rs`)
+   Normal prose bytes (`a-z`, `A-Z`, `0-9`, `.`, `,`, space, …) were triggering ~25
+   sequential parser attempts before reaching `parse_text`. A first-byte dispatch
+   now jumps straight to `parse_text` for bytes that cannot start any special inline
+   sequence. Guarded edge cases: hard line break (`≥2 spaces + \n`), GFM autolink
+   literals, emoji shortcodes, and platform mentions all still fall through to full
+   dispatch when needed.
+
+3. **`normalize_label` — no intermediate Vec** (`src/parser/ast.rs`)
+   `split_whitespace().collect::<Vec<_>>().join(" ")` on every link reference lookup
+   replaced with a direct `String` write loop.
+
+4. **HTML renderer — allocation reductions** (`src/render/markdown.rs`)
+   - Output `String` pre-allocated with `with_capacity(nodes × 64)` to reduce
+     early reallocations.
+   - Heading level rendered as a `char` via `char::from_digit` (no `to_string()` heap alloc).
+   - `escape_html(&effective_id)` computed once and reused for both the `id` attribute
+     and the anchor `href`.
+   - `format!("<li id=\"fn{}\">" , n)` and `format!(" class=\"language-{}\"", …)`
+     hot paths replaced with `push_str` / `push` chains.
+
+5. **`parse_inlines_from_span` — Vec capacity hint** (`src/parser/inlines/mod.rs`)
+   Inline node accumulator seeded with `Vec::with_capacity(8)` to avoid
+   reallocation on the first few nodes.
+
+Before / after (parse mode, 50-iteration mean, release build):
+
+| Workload | Before (ns) | After (ns) | Δ |
+|---|---|---|---|
+| small (~1 KB) | 6 472 | 5 003 | −23% |
+| medium (~10 KB) | 146 263 | 91 524 | −37% |
+| large (~100 KB) | 2 727 867 | 2 103 670 | −23% |
+| pathological | 11 516 501 | 9 127 307 | −21% |
+| spec:gfm | 433 231 | 361 778 | −16% |
 
 #### Integration tests — file names standardised to `*_it.rs`
 All 23 integration test files under `tests/` were renamed to the `*_it.rs`

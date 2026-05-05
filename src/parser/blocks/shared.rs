@@ -2,7 +2,8 @@
 // Contains span conversion helpers and common types
 
 pub use crate::parser::shared::{
-    to_parser_span, to_parser_span_range_inclusive as to_parser_span_range, GrammarSpan,
+    opt_span, opt_span_range_inclusive as opt_span_range, to_parser_span,
+    to_parser_span_range_inclusive as to_parser_span_range, GrammarSpan,
 };
 // No local Position/Span imports required here; use canonical helpers from parser::shared
 

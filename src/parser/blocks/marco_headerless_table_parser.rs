@@ -22,7 +22,7 @@ pub fn parse_marco_headerless_table<'a>(
     full_start: GrammarSpan<'a>,
     full_end: GrammarSpan<'a>,
 ) -> Node {
-    let span = crate::parser::shared::to_parser_span_range(full_start, full_end);
+    let span = crate::parser::shared::opt_span_range(full_start, full_end);
 
     let delimiter_cells = split_pipe_row_cells(table.delimiter_line);
 
@@ -48,7 +48,7 @@ pub fn parse_marco_headerless_table<'a>(
 
     Node {
         kind: NodeKind::Table { alignments },
-        span: Some(span),
+        span,
         children: rows,
     }
 }

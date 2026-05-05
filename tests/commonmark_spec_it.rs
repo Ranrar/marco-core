@@ -201,6 +201,7 @@ fn test_commonmark_spec_matches_expected_html() {
 }
 
 #[test]
+#[cfg(all(feature = "render-diagrams", feature = "render-math"))]
 fn test_extension_fixtures_match_expected_html() {
     let suites = [
         ("diagram", include_str!("../tools/spec/diagram.json")),

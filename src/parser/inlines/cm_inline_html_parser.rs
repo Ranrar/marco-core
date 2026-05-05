@@ -3,7 +3,7 @@
 //! Parses inline HTML tags (`<tag>`, `<tag/>`, etc.) and converts them to InlineHtml nodes.
 //! Inline HTML is preserved as-is without further parsing.
 
-use super::shared::{to_parser_span_range, GrammarSpan};
+use super::shared::{opt_span_range, GrammarSpan};
 use crate::grammar::inlines as grammar;
 use crate::parser::ast::{Node, NodeKind};
 use nom::IResult;
@@ -34,11 +34,11 @@ pub fn parse_inline_html(input: GrammarSpan) -> IResult<GrammarSpan, Node> {
     let html = start.take(html_len).fragment().to_string();
 
     // Create span for the full HTML tag
-    let span = to_parser_span_range(start, rest);
+    let span = opt_span_range(start, rest);
 
     let node = Node {
         kind: NodeKind::InlineHtml(html),
-        span: Some(span),
+        span,
         children: Vec::new(),
     };
 

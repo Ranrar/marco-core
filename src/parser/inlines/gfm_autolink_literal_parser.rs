@@ -9,7 +9,7 @@
 //! This is an inline parser (not grammar) because autolink literals are recognized
 //! within text nodes and depend on context/path-validation rules.
 
-use super::shared::{to_parser_span, GrammarSpan};
+use super::shared::{opt_span, GrammarSpan};
 use crate::parser::ast::{Node, NodeKind};
 use nom::bytes::complete::take;
 use nom::IResult;
@@ -42,17 +42,17 @@ pub fn parse_gfm_autolink_literal(input: GrammarSpan) -> IResult<GrammarSpan, No
     let (rest, matched_span) = take(m.len).parse(input)?;
 
     let label = matched_span.fragment().to_string();
-    let span = to_parser_span(matched_span);
+    let span = opt_span(matched_span);
 
     let node = Node {
         kind: NodeKind::Link {
             url: m.href,
             title: None,
         },
-        span: Some(span),
+        span,
         children: vec![Node {
             kind: NodeKind::Text(label),
-            span: Some(to_parser_span(matched_span)),
+            span: opt_span(matched_span),
             children: Vec::new(),
         }],
     };

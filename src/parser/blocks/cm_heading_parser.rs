@@ -3,7 +3,7 @@
 //! Handles conversion of both ATX headings (# Header) and Setext headings (underline style)
 //! from grammar layer to parser AST representation.
 
-use super::shared::{to_parser_span, to_parser_span_range, GrammarSpan};
+use super::shared::{opt_span, opt_span_range, GrammarSpan};
 use crate::parser::ast::{Node, NodeKind};
 
 /// Parse an ATX heading (# Header) into an AST node.
@@ -27,12 +27,12 @@ use crate::parser::ast::{Node, NodeKind};
 /// assert!(matches!(node.kind, NodeKind::Heading { level: 1, .. }));
 /// ```
 pub fn parse_atx_heading(level: u8, content: GrammarSpan) -> Node {
-    let span = to_parser_span(content);
+    let span = opt_span(content);
     let (text, id) = split_extended_heading_id(content.fragment());
 
     Node {
         kind: NodeKind::Heading { level, text, id },
-        span: Some(span),
+        span,
         children: Vec::new(),
     }
 }
@@ -62,12 +62,12 @@ pub fn parse_setext_heading(
     // - `content` is the heading text *without* the underline.
     // - `full_start..full_end` covers the entire setext construct including the underline,
     //   which is what we want for highlighting.
-    let span = to_parser_span_range(full_start, full_end);
+    let span = opt_span_range(full_start, full_end);
     let (text, id) = split_extended_heading_id(content.fragment());
 
     Node {
         kind: NodeKind::Heading { level, text, id },
-        span: Some(span),
+        span,
         children: Vec::new(),
     }
 }

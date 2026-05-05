@@ -8,7 +8,7 @@
 //! This parser is intentionally conservative to avoid consuming emails or other
 //! @-uses. It only triggers when a `[` platform section follows the username.
 
-use super::shared::{to_parser_span, GrammarSpan};
+use super::shared::{opt_span, GrammarSpan};
 use crate::parser::ast::{Node, NodeKind};
 use nom::IResult;
 use nom::Input;
@@ -205,7 +205,7 @@ pub fn parse_platform_mention(input: GrammarSpan) -> IResult<GrammarSpan, Node> 
                 platform,
                 display,
             },
-            span: Some(to_parser_span(taken)),
+            span: opt_span(taken),
             children: Vec::new(),
         },
     ))

@@ -3,7 +3,7 @@
 //! Handles conversion of thematic breaks (horizontal rules: ---, ***, ___)
 //! from grammar layer to parser AST representation.
 
-use super::shared::{to_parser_span, GrammarSpan};
+use super::shared::{opt_span, GrammarSpan};
 use crate::parser::ast::{Node, NodeKind};
 
 /// Parse a thematic break into an AST node.
@@ -21,11 +21,11 @@ use crate::parser::ast::{Node, NodeKind};
 /// assert!(matches!(node.kind, NodeKind::ThematicBreak));
 /// ```
 pub fn parse_thematic_break(content: GrammarSpan) -> Node {
-    let span = to_parser_span(content);
+    let span = opt_span(content);
 
     Node {
         kind: NodeKind::ThematicBreak,
-        span: Some(span),
+        span,
         children: Vec::new(),
     }
 }
