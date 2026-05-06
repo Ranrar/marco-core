@@ -1,9 +1,17 @@
 use crossterm::style::{Attribute, Color, SetAttribute, SetForegroundColor, ResetColor};
+use marco_core::parser::position::Span;
 use marco_core::{Document, Node, NodeKind};
 use std::fmt::Write as FmtWrite;
 
 /// Print the AST for the given document to stdout.
-pub fn print_ast(doc: &Document, use_color: bool, compact: bool) -> String {
+pub fn print_ast(
+    doc: &Document,
+    source: Option<&str>,
+    use_color: bool,
+    compact: bool,
+    show_spans: bool,
+    show_excerpts: bool,
+) -> String {
     let mut buf = String::new();
     let n = doc.children.len();
     let noun = if n == 1 { "node" } else { "nodes" };
@@ -22,7 +30,17 @@ pub fn print_ast(doc: &Document, use_color: bool, compact: bool) -> String {
 
     for (i, child) in doc.children.iter().enumerate() {
         let is_last = i == n - 1;
-        print_node(child, "", is_last, use_color, compact, &mut buf);
+        print_node(
+            child,
+            source,
+            "",
+            is_last,
+            use_color,
+            compact,
+            show_spans,
+            show_excerpts,
+            &mut buf,
+        );
     }
 
     buf
@@ -30,14 +48,27 @@ pub fn print_ast(doc: &Document, use_color: bool, compact: bool) -> String {
 
 fn print_node(
     node: &Node,
+    source: Option<&str>,
     prefix: &str,
     is_last: bool,
     use_color: bool,
     compact: bool,
+    show_spans: bool,
+    show_excerpts: bool,
     buf: &mut String,
 ) {
     let connector = if is_last { "└── " } else { "├── " };
     let (label, attrs) = format_kind(&node.kind);
+    let span_info = if show_spans {
+        format_span(node.span)
+    } else {
+        String::new()
+    };
+    let excerpt_info = if show_excerpts {
+        format_excerpt(source, node.span)
+    } else {
+        String::new()
+    };
     let color = kind_color(&node.kind);
     let is_stray = is_stray_delimiter(&node.kind);
 
@@ -71,13 +102,50 @@ fn print_node(
                 ResetColor,
             );
         }
+        if !span_info.is_empty() {
+            let _ = write!(
+                buf,
+                " {}{}{}{}",
+                SetForegroundColor(Color::DarkGrey),
+                SetAttribute(Attribute::Dim),
+                span_info,
+                ResetColor,
+            );
+        }
+        if !excerpt_info.is_empty() {
+            let _ = write!(
+                buf,
+                " {}{}{}{}",
+                SetForegroundColor(Color::DarkGrey),
+                SetAttribute(Attribute::Dim),
+                excerpt_info,
+                ResetColor,
+            );
+        }
         buf.push('\n');
     } else {
         let warn = if is_stray { "⚠ " } else { "" };
-        if attrs.is_empty() {
+        let mut extras = String::new();
+        if !attrs.is_empty() {
+            extras.push_str(&attrs);
+        }
+        if !span_info.is_empty() {
+            if !extras.is_empty() {
+                extras.push(' ');
+            }
+            extras.push_str(&span_info);
+        }
+        if !excerpt_info.is_empty() {
+            if !extras.is_empty() {
+                extras.push(' ');
+            }
+            extras.push_str(&excerpt_info);
+        }
+
+        if extras.is_empty() {
             let _ = writeln!(buf, "{prefix}{connector}{warn}{label}");
         } else {
-            let _ = writeln!(buf, "{prefix}{connector}{warn}{label} {attrs}");
+            let _ = writeln!(buf, "{prefix}{connector}{warn}{label} {extras}");
         }
     }
 
@@ -88,8 +156,55 @@ fn print_node(
     let child_prefix = format!("{}{}", prefix, if is_last { "    " } else { "│   " });
     let n = node.children.len();
     for (i, child) in node.children.iter().enumerate() {
-        print_node(child, &child_prefix, i == n - 1, use_color, compact, buf);
+        print_node(
+            child,
+            source,
+            &child_prefix,
+            i == n - 1,
+            use_color,
+            compact,
+            show_spans,
+            show_excerpts,
+            buf,
+        );
     }
+}
+
+fn format_span(span: Option<Span>) -> String {
+    match span {
+        Some(span) => format!(
+            "[L{}:C{}..L{}:C{} bytes {}..{}]",
+            span.start.line,
+            span.start.column,
+            span.end.line,
+            span.end.column,
+            span.start.offset,
+            span.end.offset,
+        ),
+        None => "[span=none]".to_string(),
+    }
+}
+
+fn format_excerpt(source: Option<&str>, span: Option<Span>) -> String {
+    let (Some(source), Some(span)) = (source, span) else {
+        return String::new();
+    };
+    let Some(slice) = source.get(span.start.offset..span.end.offset) else {
+        return String::from("«<non-boundary slice>»");
+    };
+    if slice.is_empty() {
+        return String::new();
+    }
+    let normalized = slice.replace('\n', "↵");
+    let mut short = String::new();
+    for (count, ch) in normalized.chars().enumerate() {
+        if count >= 40 {
+            short.push('…');
+            break;
+        }
+        short.push(ch);
+    }
+    format!("«{}»", short)
 }
 
 fn truncate(s: &str, max: usize) -> String {
@@ -282,5 +397,47 @@ fn is_stray_delimiter(kind: &NodeKind) -> bool {
                 .all(|c| matches!(c, '*' | '_' | '~' | '=' | '^' | '`'))
     } else {
         false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use marco_core::parser::position::{Position, Span};
+
+    #[test]
+    fn print_ast_includes_span_metadata_when_enabled() {
+        let doc = Document {
+            children: vec![Node {
+                kind: NodeKind::Text("abc".to_string()),
+                span: Some(Span::new(
+                    Position::new(1, 1, 0),
+                    Position::new(1, 4, 3),
+                )),
+                children: Vec::new(),
+            }],
+            references: Default::default(),
+        };
+
+        let printed = print_ast(&doc, Some("abc"), false, false, true, false);
+        assert!(printed.contains("[L1:C1..L1:C4 bytes 0..3]"));
+    }
+
+    #[test]
+    fn print_ast_includes_excerpt_when_enabled() {
+        let doc = Document {
+            children: vec![Node {
+                kind: NodeKind::Text("abc".to_string()),
+                span: Some(Span::new(
+                    Position::new(1, 1, 0),
+                    Position::new(1, 4, 3),
+                )),
+                children: Vec::new(),
+            }],
+            references: Default::default(),
+        };
+
+        let printed = print_ast(&doc, Some("abc"), false, false, false, true);
+        assert!(printed.contains("«abc»"));
     }
 }

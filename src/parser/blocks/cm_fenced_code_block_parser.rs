@@ -28,9 +28,7 @@ pub fn parse_fenced_code_block(language: Option<String>, content: GrammarSpan) -
 
     // Detect Mermaid diagrams (```mermaid ... ```)
     if let Some(ref lang) = language {
-        if crate::parser::shared::parse_diagrams_enabled()
-            && lang.eq_ignore_ascii_case("mermaid")
-        {
+        if crate::parser::shared::parse_diagrams_enabled() && lang.eq_ignore_ascii_case("mermaid") {
             return Node {
                 kind: NodeKind::MermaidDiagram { content: code },
                 span,

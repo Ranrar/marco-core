@@ -7,6 +7,8 @@ mod output;
 
 use clap::Parser;
 use cli::{Args, OutputMode};
+use output::TimingInfo;
+use std::time::Instant;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
@@ -27,8 +29,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         marco_core::InputSource::Keyboard
     };
-    let sanitized = marco_core::sanitize_input(source.as_bytes(), input_source);
+    let sanitize_started = Instant::now();
+    let (sanitized, sanitize_stats) =
+        marco_core::sanitize_input_with_stats(source.as_bytes(), input_source);
+    let sanitize_time = sanitize_started.elapsed();
 
+    let parse_started = Instant::now();
     let doc = match marco_core::parse(&sanitized) {
         Ok(d) => d,
         Err(e) => {
@@ -58,12 +64,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             std::process::exit(1);
         }
     };
+    let timings = TimingInfo {
+        sanitize: sanitize_time,
+        parse: parse_started.elapsed(),
+    };
 
-    let payload = match &args.mode {
-        OutputMode::Ast => output::run_ast_mode(&doc, &sanitized, &args),
-        OutputMode::Html => output::run_html_mode(&doc, &sanitized, &args),
-        OutputMode::Both => output::run_both_mode(&doc, &sanitized, &args),
-        OutputMode::Intel => output::run_intel_mode(&doc, &sanitized, &args),
+    let payload = if args.json {
+        output::run_json_mode(&doc, &sanitized, &sanitize_stats, &timings, &args.mode, &args)
+    } else {
+        match &args.mode {
+            OutputMode::Ast => {
+                output::run_ast_mode(&doc, &sanitized, &sanitize_stats, &timings, &args)
+            }
+            OutputMode::Html => {
+                output::run_html_mode(&doc, &sanitized, &sanitize_stats, &timings, &args)
+            }
+            OutputMode::Both => {
+                output::run_both_mode(&doc, &sanitized, &sanitize_stats, &timings, &args)
+            }
+            OutputMode::Intel => {
+                output::run_intel_mode(&doc, &sanitized, &sanitize_stats, &timings, &args)
+            }
+        }
     };
 
     if args.log {

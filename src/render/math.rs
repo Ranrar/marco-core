@@ -13,7 +13,7 @@ pub(crate) fn render_inline_math(latex: &str) -> Result<String, Box<dyn std::err
         .output(OutputFormat::Mathml)
         .build();
     let html = katex_render(ctx, latex, &settings)?;
-    Ok(html)
+    Ok(normalize_math_attrs(html))
 }
 
 /// Render display math using KaTeX.
@@ -24,7 +24,17 @@ pub(crate) fn render_display_math(latex: &str) -> Result<String, Box<dyn std::er
         .output(OutputFormat::Mathml)
         .build();
     let html = katex_render(ctx, latex, &settings)?;
-    Ok(html)
+    Ok(normalize_math_attrs(html))
+}
+
+/// Normalize the attribute order on `<math>` elements so output is deterministic
+/// regardless of KaTeX's internal initialization order. Always emits
+/// `xmlns` before `display`.
+fn normalize_math_attrs(html: String) -> String {
+    html.replace(
+        r#"<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">"#,
+        r#"<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">"#,
+    )
 }
 
 #[cfg(test)]

@@ -92,9 +92,43 @@ pub fn parse_footnote_definition(input: GrammarSpan) -> Option<(GrammarSpan, Nod
             .unwrap_or(frag.len());
         let next_line = &frag[cursor..next_line_end];
 
-        // Stop at blank line.
+        // On a blank line: look ahead to see whether the next non-blank line
+        // is 4-space (or tab) indented.  If so, consume the blank line and
+        // the following indented lines as a paragraph continuation.
+        // Otherwise stop — the definition is complete.
         if next_line.trim().is_empty() {
-            break;
+            let mut lookahead = next_line_end;
+            if lookahead < frag.len() {
+                lookahead += 1; // skip the '\n' of the blank line
+            }
+            // Skip any additional blank lines.
+            while lookahead < frag.len() {
+                let ll_end = frag[lookahead..]
+                    .find('\n')
+                    .map(|r| lookahead + r)
+                    .unwrap_or(frag.len());
+                let ll = &frag[lookahead..ll_end];
+                if ll.trim().is_empty() {
+                    lookahead = ll_end;
+                    if lookahead < frag.len() {
+                        lookahead += 1;
+                    }
+                } else {
+                    break;
+                }
+            }
+            // Check whether the first real line after the blank(s) is indented.
+            let has_continuation = lookahead < frag.len()
+                && (frag[lookahead..].starts_with("    ")
+                    || frag[lookahead..].starts_with('\t'));
+            if !has_continuation {
+                break;
+            }
+            // Accept blank separator: emit a blank line in content so the
+            // downstream inline parser can split it into a new paragraph.
+            content.push_str("\n\n");
+            cursor = lookahead;
+            continue;
         }
 
         let (is_cont, line_content) = if let Some(stripped) = next_line.strip_prefix("    ") {
@@ -118,6 +152,12 @@ pub fn parse_footnote_definition(input: GrammarSpan) -> Option<(GrammarSpan, Nod
         }
         consumed_len = cursor;
     }
+
+    // Advance consumed_len to cover all content collected (cursor may have
+    // moved past blank lines but consumed_len only tracks confirmed content).
+    // For the blank-line lookahead path, consumed_len is not updated inside
+    // that branch intentionally — we re-enter the loop and update it on the
+    // next indented line.
 
     let (rest, _taken) = input.take_split(consumed_len);
     // Use the exclusive (non-inclusive) version so the span ends at the first

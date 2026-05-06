@@ -115,3 +115,8 @@ fn test_marco_fixtures_match_expected_html() {
 fn test_math_fixtures_match_expected_html() {
     run_fixture_suite("math", include_str!("../spec/math.json"));
 }
+
+#[test]
+fn test_combos_fixtures_match_expected_html() {
+    run_fixture_suite("combos", include_str!("../spec/combos.json"));
+}

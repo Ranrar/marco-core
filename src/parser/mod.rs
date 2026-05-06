@@ -93,11 +93,8 @@ pub fn parse_with_options(
 
     // Set thread-local options for the duration of this parse call.
     // The guard restores previous values on drop (including on error).
-    let _guard = shared::ParseOptionsGuard::new(
-        opts.track_positions,
-        opts.parse_math,
-        opts.parse_diagrams,
-    );
+    let _guard =
+        shared::ParseOptionsGuard::new(opts.track_positions, opts.parse_math, opts.parse_diagrams);
 
     let mut document = parse_blocks(input)?;
     log::debug!("Parsed {} blocks", document.children.len());

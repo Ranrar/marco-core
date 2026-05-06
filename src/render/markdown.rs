@@ -82,7 +82,7 @@ pub fn render_html(
 
             html.push_str("<li id=\"fn");
             html.push_str(&n.to_string());
-            html.push_str("\">" );
+            html.push_str("\">");
             for child in &def_node.children {
                 render_node(child, &mut html, options, &mut ctx)?;
             }
@@ -599,42 +599,42 @@ fn render_node(
             // Render Mermaid diagram using mermaid-rs-renderer with per-render-pass caching.
             #[cfg(feature = "render-diagrams")]
             {
-            let cache_key = (options.theme.clone(), content.clone());
-            let rendered = if let Some(cached) = ctx.mermaid_result_cache.get(&cache_key) {
-                cached.clone()
-            } else {
-                let fresh = match render_mermaid_diagram(content, &options.theme) {
-                    Ok(svg) => Ok(svg),
-                    Err(e) => Err(e.to_string()),
+                let cache_key = (options.theme.clone(), content.clone());
+                let rendered = if let Some(cached) = ctx.mermaid_result_cache.get(&cache_key) {
+                    cached.clone()
+                } else {
+                    let fresh = match render_mermaid_diagram(content, &options.theme) {
+                        Ok(svg) => Ok(svg),
+                        Err(e) => Err(e.to_string()),
+                    };
+                    ctx.mermaid_result_cache.insert(cache_key, fresh.clone());
+                    fresh
                 };
-                ctx.mermaid_result_cache.insert(cache_key, fresh.clone());
-                fresh
-            };
 
-            match rendered {
-                Ok(svg) => {
-                    output.push_str("<div class=\"marco-diagram\">");
-                    output.push_str(&svg);
-                    output.push_str("</div>\n");
-                }
-                Err(e) => {
-                    log::warn!("Mermaid render error: {}", e);
-                    // Fallback: show raw Mermaid in a code block
-                    let mut title = String::from("Failed to render diagram: ");
-                    let max_len = 160usize;
-                    if e.chars().count() > max_len {
-                        title.push_str(&e.chars().take(max_len).collect::<String>());
-                        title.push('…');
-                    } else {
-                        title.push_str(&e);
+                match rendered {
+                    Ok(svg) => {
+                        output.push_str("<div class=\"marco-diagram\">");
+                        output.push_str(&svg);
+                        output.push_str("</div>\n");
                     }
-                    output.push_str("<pre class=\"mermaid-error\" title=\"");
-                    output.push_str(&escape_html(&title));
-                    output.push_str("\"><code>");
-                    output.push_str(&escape_html(content));
-                    output.push_str("</code></pre>\n");
+                    Err(e) => {
+                        log::warn!("Mermaid render error: {}", e);
+                        // Fallback: show raw Mermaid in a code block
+                        let mut title = String::from("Failed to render diagram: ");
+                        let max_len = 160usize;
+                        if e.chars().count() > max_len {
+                            title.push_str(&e.chars().take(max_len).collect::<String>());
+                            title.push('…');
+                        } else {
+                            title.push_str(&e);
+                        }
+                        output.push_str("<pre class=\"mermaid-error\" title=\"");
+                        output.push_str(&escape_html(&title));
+                        output.push_str("\"><code>");
+                        output.push_str(&escape_html(content));
+                        output.push_str("</code></pre>\n");
+                    }
                 }
-            }
             }
             #[cfg(not(feature = "render-diagrams"))]
             {
@@ -1054,9 +1054,7 @@ fn render_list_item(
 
     if let Some(checked) = task_checked {
         if checked {
-            output.push_str(
-                "<li class=\"marco-task-list-item marco-task-list-item--checked\">",
-            );
+            output.push_str("<li class=\"marco-task-list-item marco-task-list-item--checked\">");
         } else {
             output.push_str("<li class=\"marco-task-list-item\">");
         }

@@ -35,14 +35,14 @@ pub use catalog::{
 };
 #[cfg(feature = "intelligence-highlights")]
 pub use editor::{compute_highlights, compute_highlights_with_source, Highlight, HighlightTag};
-#[cfg(feature = "intelligence-completions")]
-pub use editor::{get_markdown_completions, CompletionItem};
 #[cfg(feature = "intelligence-hover")]
 pub use editor::{get_hover_info, get_position_span, HoverInfo};
+#[cfg(feature = "intelligence-completions")]
+pub use editor::{get_markdown_completions, CompletionItem};
 
+use crate::parser::Document;
 #[cfg(feature = "intelligence-hover")]
 use crate::parser::Position;
-use crate::parser::Document;
 
 /// In-process provider for editor intelligence features.
 #[derive(Default)]

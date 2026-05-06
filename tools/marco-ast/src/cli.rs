@@ -43,6 +43,26 @@ pub struct Args {
     #[arg(long)]
     pub compact: bool,
 
+    /// Emit a structured JSON report instead of human-readable sections.
+    #[arg(long)]
+    pub json: bool,
+
+    /// Print line/column/byte spans next to AST nodes.
+    #[arg(long)]
+    pub spans: bool,
+
+    /// Print source excerpts (byte-sliced from spans) next to AST nodes.
+    #[arg(long)]
+    pub excerpts: bool,
+
+    /// Print UTF-8 / byte-vs-char inspection details.
+    #[arg(long)]
+    pub utf8: bool,
+
+    /// Print sanitize/parse/render/intelligence timing summary.
+    #[arg(long)]
+    pub time: bool,
+
     /// Enable syntax highlighting in HTML output.
     #[arg(long)]
     pub syntax: bool,

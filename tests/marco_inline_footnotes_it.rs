@@ -56,3 +56,36 @@ fn test_inline_footnote_does_not_break_superscript() {
     // Footnote still works.
     assert!(html.contains("<section class=\"footnotes\">"));
 }
+
+#[test]
+fn test_inline_footnote_spans_multiple_lines() {
+    // An inline footnote whose content spans multiple lines of the source
+    // paragraph must be parsed correctly — not rendered as literal `^[...]`.
+    let input = "A fact^[This spans\ntwo lines].\n";
+    let doc = parse(input).expect("parse failed");
+    let options = RenderOptions::default();
+    let html = marco_core::render::render(&doc, &options).expect("render failed");
+
+    assert!(
+        html.contains("<sup class=\"footnote-ref\">"),
+        "inline fn not parsed (still literal): {html}"
+    );
+    assert!(!html.contains("^["), "raw ^[ marker in output: {html}");
+    assert!(html.contains("<section class=\"footnotes\">"));
+    assert!(html.contains("This spans"));
+}
+
+#[test]
+fn test_inline_footnote_multiline_with_markup() {
+    // Multi-line inline footnote content with inline markup inside.
+    let input =
+        "Note^[This is defined\ninline. It contains *italic*, **bold**, and `code`.].\n";
+    let doc = parse(input).expect("parse failed");
+    let options = RenderOptions::default();
+    let html = marco_core::render::render(&doc, &options).expect("render failed");
+
+    assert!(html.contains("<sup class=\"footnote-ref\">"));
+    assert!(html.contains("<em>italic</em>"), "italic lost in multi-line fn");
+    assert!(html.contains("<strong>bold</strong>"), "bold lost in multi-line fn");
+    assert!(html.contains("<code>code</code>"), "code lost in multi-line fn");
+}

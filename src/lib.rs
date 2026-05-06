@@ -29,10 +29,10 @@ pub mod render;
 pub use intelligence::MarkdownIntelligenceProvider;
 /// Parse Markdown text into a [`Document`] AST using default options.
 pub use parser::parse;
-/// Runtime parse configuration; pass to [`parse_with_options`] to skip expensive work.
-pub use parser::ParseOptions;
 /// Parse Markdown with explicit runtime options (position tracking, math, diagrams).
 pub use parser::parse_with_options;
+/// Runtime parse configuration; pass to [`parse_with_options`] to skip expensive work.
+pub use parser::ParseOptions;
 /// Core AST types used by parser, renderer, and intelligence modules.
 pub use parser::{Document, Node, NodeKind};
 /// Render a parsed [`Document`] into HTML using [`RenderOptions`].

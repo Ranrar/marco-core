@@ -1,9 +1,10 @@
 use rustyline::DefaultEditor;
 use rustyline::error::ReadlineError;
+use std::time::Instant;
 
 use crate::cli::{Args, OutputMode};
 use crate::logging::{append_log_event, LogEvent};
-use crate::output::{run_ast_mode, run_both_mode, run_html_mode, run_intel_mode};
+use crate::output::{run_ast_mode, run_both_mode, run_html_mode, run_intel_mode, run_json_mode, TimingInfo};
 
 pub fn run(args: &Args, session_id: Option<uuid::Uuid>) -> Result<(), Box<dyn std::error::Error>> {
     let mut rl = DefaultEditor::new()?;
@@ -36,14 +37,28 @@ pub fn run(args: &Args, session_id: Option<uuid::Uuid>) -> Result<(), Box<dyn st
                 }
 
                 // Parse and process Markdown input
-                let sanitized = marco_core::sanitize_input(trimmed.as_bytes(), marco_core::InputSource::Keyboard);
+                let sanitize_started = Instant::now();
+                let (sanitized, sanitize_stats) = marco_core::sanitize_input_with_stats(
+                    trimmed.as_bytes(),
+                    marco_core::InputSource::Keyboard,
+                );
+                let sanitize_time = sanitize_started.elapsed();
+                let parse_started = Instant::now();
                 match marco_core::parse(&sanitized) {
                     Ok(doc) => {
-                        let payload = match &mode {
-                            OutputMode::Ast => run_ast_mode(&doc, &sanitized, args),
-                            OutputMode::Html => run_html_mode(&doc, &sanitized, args),
-                            OutputMode::Both => run_both_mode(&doc, &sanitized, args),
-                            OutputMode::Intel => run_intel_mode(&doc, &sanitized, args),
+                        let timings = TimingInfo {
+                            sanitize: sanitize_time,
+                            parse: parse_started.elapsed(),
+                        };
+                        let payload = if args.json {
+                            run_json_mode(&doc, &sanitized, &sanitize_stats, &timings, &mode, args)
+                        } else {
+                            match &mode {
+                                OutputMode::Ast => run_ast_mode(&doc, &sanitized, &sanitize_stats, &timings, args),
+                                OutputMode::Html => run_html_mode(&doc, &sanitized, &sanitize_stats, &timings, args),
+                                OutputMode::Both => run_both_mode(&doc, &sanitized, &sanitize_stats, &timings, args),
+                                OutputMode::Intel => run_intel_mode(&doc, &sanitized, &sanitize_stats, &timings, args),
+                            }
                         };
 
                         if args.log {

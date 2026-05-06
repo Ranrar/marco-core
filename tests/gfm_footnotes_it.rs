@@ -45,3 +45,38 @@ fn test_gfm_footnotes_multiline_definition() {
     assert!(html.contains("second line"));
     assert!(html.contains("third line"));
 }
+
+#[test]
+fn test_gfm_footnotes_multiparagraph_definition() {
+    // A blank line followed by a 4-space-indented continuation must be consumed
+    // as part of the footnote definition, not parsed as an indented code block.
+    let input = "See[^1]\n\n[^1]: First para.\n\n    Second para.\n";
+    let doc = parse(input).expect("parse failed");
+    let options = RenderOptions::default();
+    let html = marco_core::render::render(&doc, &options).expect("render failed");
+
+    assert!(html.contains("<section class=\"footnotes\">"));
+    // Both paragraphs must appear inside the footnote section.
+    assert!(html.contains("First para."), "first para lost: {html}");
+    assert!(html.contains("Second para."), "second para lost: {html}");
+    // The continuation must NOT become a standalone indented code block.
+    assert!(
+        !html.contains("marco-code-block"),
+        "continuation became code block: {html}"
+    );
+}
+
+#[test]
+fn test_gfm_footnotes_multiparagraph_three_paras() {
+    let input = "Ref[^x]\n\n[^x]: Para one.\n\n    Para two.\n\n    Para three.\n\nNormal text.\n";
+    let doc = parse(input).expect("parse failed");
+    let options = RenderOptions::default();
+    let html = marco_core::render::render(&doc, &options).expect("render failed");
+
+    assert!(html.contains("Para one."), "para one lost");
+    assert!(html.contains("Para two."), "para two lost");
+    assert!(html.contains("Para three."), "para three lost");
+    assert!(!html.contains("marco-code-block"), "continuation became code block");
+    // Normal text after the footnote block must still render.
+    assert!(html.contains("Normal text."), "normal text lost");
+}
