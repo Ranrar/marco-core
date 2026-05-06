@@ -14,6 +14,9 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
+/// The crate version from `Cargo.toml`, exposed for downstream UIs and diagnostics.
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 /// Low-level Markdown grammar components (block and inline parsers).
 pub mod grammar;
 /// Editor intelligence APIs such as diagnostics, highlights, completions, and TOC.

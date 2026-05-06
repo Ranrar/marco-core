@@ -9,6 +9,12 @@ Version scheme note: `marco-core` and `marco-shared` follow independent semver f
 
 ### Added
 
+#### Public crate version constant
+
+`marco-core` now exports `VERSION` from the crate root (`marco_core::VERSION`),
+backed by `env!("CARGO_PKG_VERSION")`, so downstream apps can display the
+library version in About dialogs and diagnostics.
+
 #### `ParseOptions` and `parse_with_options` — runtime parser control
 
 New public API that lets callers tune parse behaviour per-call without changing
