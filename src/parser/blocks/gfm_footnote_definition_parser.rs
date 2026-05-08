@@ -119,8 +119,7 @@ pub fn parse_footnote_definition(input: GrammarSpan) -> Option<(GrammarSpan, Nod
             }
             // Check whether the first real line after the blank(s) is indented.
             let has_continuation = lookahead < frag.len()
-                && (frag[lookahead..].starts_with("    ")
-                    || frag[lookahead..].starts_with('\t'));
+                && (frag[lookahead..].starts_with("    ") || frag[lookahead..].starts_with('\t'));
             if !has_continuation {
                 break;
             }

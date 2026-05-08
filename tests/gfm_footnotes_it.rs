@@ -76,7 +76,10 @@ fn test_gfm_footnotes_multiparagraph_three_paras() {
     assert!(html.contains("Para one."), "para one lost");
     assert!(html.contains("Para two."), "para two lost");
     assert!(html.contains("Para three."), "para three lost");
-    assert!(!html.contains("marco-code-block"), "continuation became code block");
+    assert!(
+        !html.contains("marco-code-block"),
+        "continuation became code block"
+    );
     // Normal text after the footnote block must still render.
     assert!(html.contains("Normal text."), "normal text lost");
 }

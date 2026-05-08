@@ -78,14 +78,22 @@ fn test_inline_footnote_spans_multiple_lines() {
 #[test]
 fn test_inline_footnote_multiline_with_markup() {
     // Multi-line inline footnote content with inline markup inside.
-    let input =
-        "Note^[This is defined\ninline. It contains *italic*, **bold**, and `code`.].\n";
+    let input = "Note^[This is defined\ninline. It contains *italic*, **bold**, and `code`.].\n";
     let doc = parse(input).expect("parse failed");
     let options = RenderOptions::default();
     let html = marco_core::render::render(&doc, &options).expect("render failed");
 
     assert!(html.contains("<sup class=\"footnote-ref\">"));
-    assert!(html.contains("<em>italic</em>"), "italic lost in multi-line fn");
-    assert!(html.contains("<strong>bold</strong>"), "bold lost in multi-line fn");
-    assert!(html.contains("<code>code</code>"), "code lost in multi-line fn");
+    assert!(
+        html.contains("<em>italic</em>"),
+        "italic lost in multi-line fn"
+    );
+    assert!(
+        html.contains("<strong>bold</strong>"),
+        "bold lost in multi-line fn"
+    );
+    assert!(
+        html.contains("<code>code</code>"),
+        "code lost in multi-line fn"
+    );
 }
