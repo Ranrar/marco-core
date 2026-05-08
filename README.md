@@ -5,299 +5,156 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Rust 1.94.1](https://img.shields.io/badge/rust-1.94.1-orange.svg)](https://www.rust-lang.org)
 
-`marco-core` is a pure-Rust Markdown engine: it sanitizes UTF-8 input, parses
-Markdown into an AST with [nom][nom], renders that AST to HTML, and exposes
-editor-facing "intelligence" (highlights, diagnostics, completions, hover) for
-the [Marco][marco-editor] editor and any other downstream consumer.
+A Rust Markdown library for applications that need **editor-quality accuracy** — parse, render, and extract intelligence from Markdown.
 
-It is a **library only** — no GUI, no binaries, no GTK/WebKit dependencies.
-The single platform-gated dependency is `fontconfig` on Linux for font
-discovery used by the math/diagram renderers.
+You may be looking for:
 
-[nom]: https://github.com/rust-bakery/nom
-[marco-editor]: https://github.com/Ranrar/Marco
-
----
-
-## Pipeline
-
-```text
-  raw input (&str)
-        │
-        ▼
-  ┌──────────────────┐    logic::utf8
-  │  sanitize_input  │    • UTF-8 validation (invalid → U+FFFD)
-  │                  │    • Unicode NFC normalization
-  │                  │    • line-ending + control-char filter
-  └────────┬─────────┘
-           │ clean &str
-           ▼
-  ┌──────────────────┐    grammar/  (nom combinators, Span-tracked)
-  │ parse_blocks     │    blocks/   cm_* · gfm_* · marco_*
-  │ parse_inlines    │    inlines/  cm_* · gfm_* · marco_* · math_*
-  └────────┬─────────┘
-           │
-           ▼
-  ┌──────────────────┐    parser::parse — three passes:
-  │     Document     │     1. block + inline AST construction
-  │ ┌──────────────┐ │     2. resolve reference-style links
-  │ │ Vec<Node>    │ │     3. rewrite GFM alerts → Admonition
-  │ │ ReferenceMap │ │
-  │ └──────────────┘ │
-  └────────┬─────────┘
-           │ &Document
-           ├──────────────────────────────┐
-           ▼                              ▼
-  ┌──────────────────┐           ┌──────────────────┐
-  │  render::render  │           │   intelligence   │
-  │ ──────────────── │           │ ──────────────── │
-  │ markdown emitter │           │ highlights       │
-  │ syntect codeblks │           │ diagnostics/lint │
-  │ katex math       │           │ completion       │
-  │ mermaid diagrams │           │ hover · toc      │
-  └────────┬─────────┘           └────────┬─────────┘
-           │                              │
-           ▼                              ▼
-        String                  Vec<Highlight>
-        (HTML)                  Vec<Diagnostic>
-                                Vec<CompletionItem>
-                                Option<HoverInfo>
-```
-
----
-
-## Crate layout
-
-```text
-src/
-├── lib.rs                      Re-exports the public surface
-│
-├── grammar/                    nom combinators → spans / tokens
-│   ├── shared.rs               Span type, shared helpers
-│   ├── blocks/
-│   │   ├── cm_*.rs             CommonMark blocks
-│   │   ├── gfm_table.rs        GFM pipe tables
-│   │   └── marco_*.rs          Marco extensions (sliders, tabs, …)
-│   └── inlines/
-│       ├── cm_*.rs             CommonMark inlines
-│       ├── gfm_strikethrough.rs
-│       ├── math_inline.rs      $…$
-│       ├── math_display.rs     $$…$$
-│       └── marco_*.rs          Marco extensions
-│
-├── parser/                     Grammar output → AST
-│   ├── ast.rs                  Document, Node, NodeKind, ReferenceMap
-│   ├── position.rs             Position, Span
-│   ├── blocks/                 Block AST builders
-│   └── inlines/                Inline AST builders
-│
-├── render/                     AST → HTML
-│   ├── markdown.rs             Core HTML emitter
-│   ├── options.rs              RenderOptions
-│   ├── syntect_highlighter.rs  Code-block highlighting
-│   ├── math.rs                 KaTeX
-│   ├── diagram.rs              Mermaid
-│   ├── code_languages.rs       Language alias table
-│   ├── plarform_mentions.rs    @user / @org rendering
-│   ├── preview_document.rs     Standalone HTML doc wrapper
-│   └── base_css.rs             Bundled CSS for previews
-│
-├── intelligence/               Editor-server features over the AST
-│   ├── analysis/
-│   │   ├── diagnostics.rs      Diagnostic, DiagnosticCode, severities
-│   │   └── lint.rs             Lint reports / buckets
-│   ├── editor/
-│   │   ├── highlight.rs        Highlight, HighlightTag
-│   │   ├── completion.rs       CompletionItem
-│   │   └── hover.rs            HoverInfo
-│   ├── catalog.rs              Diagnostic catalog loader
-│   ├── diagnostics_catalog_*.ron
-│   ├── lsp_protocol.rs         Optional LSP-shaped types
-│   └── toc.rs                  Table-of-contents extraction
-│
-└── logic/                      Pure-Rust support
-    ├── cache.rs                AST + HTML caches (moka)
-    ├── utf8.rs                 sanitize_input, NFC, control filtering
-    ├── text_completion.rs
-    └── logger.rs               Optional file logger
-```
-
-Naming convention for parser-related modules:
-
-| Prefix    | Meaning                            |
-| --------- | ---------------------------------- |
-| `cm_*`    | CommonMark spec feature            |
-| `gfm_*`   | GitHub Flavored Markdown extension |
-| `marco_*` | Marco-specific extension           |
-
----
-
-## Supported Markdown
-
-| Category           | Constructs                                                                                                                                                                                                                                                                                                              |
-| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| CommonMark blocks  | ATX + setext headings, paragraphs, blockquotes, fenced & indented code, lists, link-reference defs, thematic breaks, HTML blocks                                                                                                                                                                                        |
-| CommonMark inlines | Emphasis, strong, strong+emphasis, code spans, links (inline / reference / shortcut), images, autolinks, inline HTML, hard / soft breaks, backslash escapes, entity refs                                                                                                                                                |
-| GFM                | Pipe tables (with alignment), strikethrough (`~~`), task lists, autolink literals, footnotes (`[^id]`), alerts / admonitions (`> [!NOTE]`)                                                                                                                                                                              |
-| Math               | Inline `$…$` and display `$$…$$` (rendered via [katex-rs])                                                                                                                                                                                                                                                              |
-| Diagrams           | Mermaid fenced blocks (rendered via [mermaid-rs-renderer])                                                                                                                                                                                                                                                              |
-| Marco extensions   | Headerless tables, tab blocks (`:::tab` / `@tab`), sliders (`@slidestart` / `@slideend`), inline footnotes, mark (`==…==`), subscript / superscript, dash-strikethrough, emoji shortcodes (`:smile:`), platform mentions, extended definition lists, heading IDs (`{#id}`), inline task checkboxes |
-
-[katex-rs]: https://crates.io/crates/katex-rs
-[mermaid-rs-renderer]: https://crates.io/crates/mermaid-rs-renderer
-
----
-
-## Public API
-
-`src/lib.rs` re-exports the stable surface; everything else is internal and
-may change without a major-version bump.
-
-```rust
-// Parsing
-pub use parser::parse;                                    // &str -> Document
-pub use parser::{Document, Node, NodeKind};
-
-// Rendering
-pub use render::{render, RenderOptions};                  // (&Document, &RenderOptions) -> String
-
-// Intelligence
-pub use intelligence::MarkdownIntelligenceProvider;
-
-// Caching
-pub use logic::cache::{parse_to_html, parse_to_html_cached, ParserCache};
-
-// UTF-8 sanitization (call at the input boundary)
-pub use logic::utf8::{
-    sanitize_input, sanitize_input_with_stats,
-    InputSource, SanitizeStats,
-};
-```
-
-`RenderOptions`:
-
-```rust
-pub struct RenderOptions {
-    pub syntax_highlighting: bool, // default: true
-    pub line_numbers: bool,        // default: false
-    pub theme: String,             // default: "github"
-}
-```
-
----
+- [API documentation](https://docs.rs/marco-core)
+- [Feature flags reference](#feature-flags)
+- [Changelog](CHANGELOG.md)
+- [Development guide](Documentation/DEVELOPMENT.md)
 
 ## Usage
 
-Add the dependency:
-
 ```toml
 [dependencies]
-marco-core = "1.0"
+marco-core = "1.1"
 ```
-
-### Parse + render
 
 ```rust
 use marco_core::{parse, render, RenderOptions, sanitize_input, InputSource};
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let raw = "# Hello\n\n**café** — `code`";
-    let clean = sanitize_input(raw, InputSource::File);
-
-    let document = parse(&clean)?;
-    let html = render(&document, &RenderOptions::default())?;
-
-    println!("{html}");
-    Ok(())
-}
+let raw = b"# Hello\n\n**world**";
+let clean = sanitize_input(raw, InputSource::File); // strips null bytes, fixes invalid UTF-8
+let doc = parse(&clean)?;
+let html = render(&doc, &RenderOptions::default())?;
+// <h1 id="hello"><a class="marco-heading-anchor" href="#hello">Hello</a></h1>
+// <p><strong>world</strong></p>
 ```
 
-### Cached pipeline
-
-`ParserCache` memoizes both the AST (keyed by content hash) and the rendered
-HTML (keyed by content + render-options hash):
+Skip expensive work for render-only pipelines:
 
 ```rust
-use marco_core::{parse_to_html_cached, ParserCache, RenderOptions};
+use marco_core::{parse_with_options, render, ParseOptions, RenderOptions};
 
-let cache = ParserCache::new();
-let opts  = RenderOptions::default();
-
-let html1 = parse_to_html_cached("# hi", &opts, &cache)?; // miss → parse + render
-let html2 = parse_to_html_cached("# hi", &opts, &cache)?; // hit  → cached HTML
-assert_eq!(html1, html2);
-# Ok::<(), Box<dyn std::error::Error>>(())
+let opts = ParseOptions {
+    track_positions: false, // skip span tracking
+    parse_math: false,      // skip math parser
+    parse_diagrams: false,  // skip mermaid parser
+};
+let doc = parse_with_options("## Title", opts)?;
+let html = render(&doc, &RenderOptions::default())?;
 ```
 
-### Editor intelligence
+Customize rendering (syntax highlighting is on by default, `"github"` theme):
+
+```rust
+use marco_core::RenderOptions;
+
+let opts = RenderOptions {
+    syntax_highlighting: true,
+    line_numbers: true,
+    theme: "base16-ocean.dark".to_string(),
+};
+```
+
+Editor intelligence:
 
 ```rust
 use marco_core::{parse, MarkdownIntelligenceProvider};
-use marco_core::parser::Position;
 
-let source = "# Title\n\n[broken](javascript:alert(1))";
-let document = parse(source)?;
-
+let md = "# Heading\n\nA paragraph with **bold** text.\n";
+let doc = parse(md)?;
 let mut provider = MarkdownIntelligenceProvider::new();
-provider.update_document(document);
+provider.update_document(doc);
 
-let highlights  = provider.highlights(source);
-let diagnostics = provider.diagnostics();
-let completions = provider.completions("##");
-let hover       = provider.hover(Position { line: 1, column: 3, offset: 2 });
-# Ok::<(), Box<dyn std::error::Error>>(())
+let highlights = provider.highlights(md); // syntax highlight spans
+let diagnostics = provider.diagnostics(); // linting results
+let completions = provider.completions(""); // context-aware suggestions
 ```
 
-Diagnostics are emitted with stable codes such as `UnsafeLinkProtocol`,
-`UnresolvedLinkReference`, `DuplicateHeadingId`, `EmptyCodeBlock`,
-`InlineHtmlContainsScript`, etc. Codes are grouped by feature
-(`MD1xx` headings, `MD2xx` links, `MD3xx` code, `MD4xx` images,
-`MD5xx`/`MD6xx` HTML, `MD7xx` structural). See
-[src/intelligence/analysis/diagnostics.rs](src/intelligence/analysis/diagnostics.rs)
-and the `.ron` catalogs under
-[src/intelligence/](src/intelligence/) for the full list.
+## Features
 
----
+**Parse and render**
+- CommonMark — headings, lists, blockquotes, fenced/indented code blocks, links, images, emphasis, inline HTML, autolinks, thematic breaks, link references (full, shortcut, collapsed; Unicode casefold matching)
+- GFM — tables, strikethrough (`~~text~~`), task lists, footnotes, autolink literals, alerts/admonitions (`[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`, `[!CAUTION]`)
+- Math — inline `$…$` and display `$$…$$` via KaTeX
+- Diagrams — Mermaid fenced blocks
+- Marco extensions:
+  - *Block:* sliders (`@slidestart`…`@slideend` with `---`/`--` separators and optional timer), tab blocks (`:::tab` / `@tab Name`), headerless tables (separator-first `|---|---|`), definition lists (`Term\n: Definition`)
+  - *Inline:* mark/highlight (`==text==`), superscript (`^text^`), subscript (`~text~`), subscript-arrow (`˅text˅`), dash-strikethrough (`--text--`), emoji shortcodes (`:smile:` → 😄), inline footnotes (`text^[note content]`), platform mentions (`@user[github]` / `@user[github](Display Name)`), inline task checkboxes (`[ ]` / `[x]`), custom heading IDs (`## Title {#my-id}`) — all composable and nestable with each other and with standard CommonMark/GFM inline syntax
 
-## Building & testing
+**Editor intelligence**
+- Syntax highlighting — per-node highlight tags; `compute_highlights_with_source` adds extra tags for Marco syntax markers (tab block headers, slider separators)
+- Diagnostics/linting — `UnsafeLinkProtocol`, `UnresolvedLinkReference`, and more; filter by severity with `DiagnosticsOptions`
+- Autocompletion — context-aware suggestions at cursor position
+- Hover — returns info for links, headings, and other nodes at a given `Position`
+- TOC extraction (`extract_toc`), Markdown generation (`generate_toc_markdown`), and source insertion (`replace_toc_in_text`)
 
-`marco-core` targets **stable Rust 1.94.1** (matching CI).
+**Reliability**
+- CommonMark spec conformance: 285/652 strict, 98.8% structural compliance
+- UTF-8 sanitization (`&[u8]` → `String`) strips null bytes and invalid sequences before parsing
+- GFM task list checkboxes and admonitions render as SVG icons (no CSS-only dependency)
+- 662 tests — 649 integration, 13 doc/unit — all green
 
-```bash
-cargo fmt --all --check
-cargo clippy --all-targets --locked
-cargo test  --locked
-cargo doc   --open
-cargo build --release
+## When to use marco-core
+
+| Need | Recommended |
+|---|---|
+| Fast bulk processing (static sites, CI pipelines) | [`pulldown-cmark`](https://crates.io/crates/pulldown-cmark) or [`comrak`](https://crates.io/crates/comrak) |
+| Editor intelligence (highlights, linting, completions) | **marco-core** |
+| CommonMark + GFM + math + diagrams | **marco-core** |
+| Walk or transform the AST | **marco-core** |
+| Minimal parse → render with no extras | `pulldown-cmark` |
+
+## Performance
+
+Release build, 50-iteration mean:
+
+| Input size | Parse | Render | End-to-end |
+|---|---|---|---|
+| ~1 KB | 5.0 µs | 1.2 µs | 6.2 µs |
+| ~10 KB | 91.5 µs | 8.3 µs | 99.8 µs |
+| ~100 KB | 2.1 ms | 86 µs | 2.2 ms |
+
+Suitable for interactive editors and real-time linting.
+
+## Feature flags
+
+All 8 flags are on by default. Use `default-features = false` to slim the build:
+
+```toml
+marco-core = { version = "1.1", default-features = false, features = ["render-syntax-highlighting"] }
 ```
 
-Tests:
+| Flag | Enables |
+|---|---|
+| `render-math` | KaTeX rendering |
+| `render-diagrams` | Mermaid rendering |
+| `render-syntax-highlighting` | Code block syntax highlighting |
+| `file-logger` | Log rotation and file logging |
+| `intelligence-highlights` | Syntax highlight tags |
+| `intelligence-diagnostics` | Linting and diagnostics |
+| `intelligence-completions` | Autocompletion |
+| `intelligence-hover` | Hover information |
 
-- Unit / smoke tests live alongside their module (`#[cfg(test)] mod tests`).
-- Integration tests live under [tests/](tests/), each exercising the public
-  API (CommonMark gaps, GFM tables / footnotes / task lists / admonitions,
-  Marco extensions, highlight computation, …).
+A `--no-default-features` build still includes parse + basic render.
 
-CI runs on Linux (`fmt` + `clippy` + `cargo test`) and verifies a build on
-Windows; releases are published to crates.io by
-[.github/workflows/publish-crate.yml](.github/workflows/publish-crate.yml)
-on tag push.
+## Minimum Supported Rust Version
 
----
+`marco-core` requires **Rust 1.94.1** (stable). The MSRV is pinned in CI and will not change without a minor version bump.
 
-## Versioning
+## Contributing
 
-`marco-core` follows **independent SemVer** on the `1.x.y` track. The
-re-exported surface in `lib.rs` is the API contract — additions go through a
-minor bump, breaking changes through a major bump. See
-[CHANGELOG.md](CHANGELOG.md) for the per-release diff.
-
----
+See [CONTRIBUTING.md](CONTRIBUTING.md). Detailed guides:
+- [DEVELOPMENT.md](Documentation/DEVELOPMENT.md) — setup, workflow, coding rules
+- [TESTING.md](Documentation/TESTING.md) — test inventory, CommonMark conformance
+- [TOOLS.md](Documentation/TOOLS.md) — `marco-ast` CLI, `perf-lab` benchmarking
 
 ## License
 
 MIT — see [LICENSE](LICENSE).
 
-## Related
+---
 
-- [Marco][marco-editor] — GTK4 Markdown editor that consumes this crate.
+**Related:** [Marco](https://github.com/Ranrar/Marco) is the GTK4 Markdown editor built on this crate.

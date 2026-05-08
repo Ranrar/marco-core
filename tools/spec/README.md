@@ -2,8 +2,8 @@
 
 Test fixtures used by:
 
-- `tests/commonmark_spec_it.rs`
-- `tools/tests/extension_spec_it.rs`
+- `tests/commonmark_spec_it.rs` — loads `commonmark.json` + `diagram.json` + `gfm.json` + `marco.json` + `math.json`
+- `tools/tests/extension_spec_it.rs` — loads `diagram.json` + `gfm.json` + `marco.json` + `math.json` + `combos.json`
 
 ## `commonmark.json`
 
@@ -23,7 +23,10 @@ notice.
 The following fixture files are authored for this repository and licensed under
 the same MIT license as the rest of `marco-core`:
 
-- `diagram.json` — Mermaid/diagram-focused cases and edge cases.
-- `gfm.json` — GitHub Flavored Markdown extension cases.
-- `marco.json` — Marco-specific extension cases.
-- `math.json` — math delimiter and rendering cases.
+| File | Contents |
+|---|---|
+| `diagram.json` | Mermaid / diagram-focused cases and edge cases |
+| `gfm.json` | GitHub Flavored Markdown extension cases |
+| `marco.json` | Marco-specific extension cases |
+| `math.json` | Math delimiter and rendering cases |
+| `combos.json` | Cross-feature combination and backslash-escape cases |

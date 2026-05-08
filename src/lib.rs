@@ -21,7 +21,7 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub mod grammar;
 /// Editor intelligence APIs such as diagnostics, highlights, completions, and TOC.
 pub mod intelligence;
-/// Utility logic such as cache management and UTF-8 sanitization.
+/// Utility logic such as UTF-8 sanitization and text helpers.
 pub mod logic;
 /// AST definitions and parser entry points.
 pub mod parser;
@@ -41,8 +41,5 @@ pub use parser::{Document, Node, NodeKind};
 /// Render a parsed [`Document`] into HTML using [`RenderOptions`].
 pub use render::{render, RenderOptions};
 
-/// Convenience cache-backed parsing/rendering APIs and cache type.
-#[cfg(feature = "cache")]
-pub use logic::cache::{parse_to_html, parse_to_html_cached, ParserCache};
 /// UTF-8 sanitization API and related types.
 pub use logic::utf8::{sanitize_input, sanitize_input_with_stats, InputSource, SanitizeStats};

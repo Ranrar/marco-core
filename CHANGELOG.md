@@ -7,6 +7,19 @@ Version scheme note: `marco-core` and `marco-shared` follow independent semver f
 
 ## [Unreleased]
 
+### Removed
+
+#### `cache` feature and `ParserCache` API
+
+The `cache` feature (backed by `moka`) and its public types — `ParserCache`,
+`parse_to_html`, `parse_to_html_cached` — have been removed from `marco-core`.
+
+Caching is application-level concern. Downstream consumers that need parse or
+render caching should implement it directly (e.g. wrapping `parse` + `render`
+in a `HashMap` or `moka::sync::Cache` keyed by content hash).
+
+The `moka` dependency is no longer pulled in by default.
+
 ### Added
 
 #### Public crate version constant

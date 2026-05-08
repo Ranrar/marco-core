@@ -31,7 +31,6 @@ default = [
     "render-syntax-highlighting",
     "render-math",
     "render-diagrams",
-    "cache",
     "file-logger",
 ]
 
@@ -47,7 +46,6 @@ render-math                = ["dep:katex-rs"]
 render-diagrams            = ["dep:mermaid-rs-renderer"]
 
 # Runtime utilities
-cache       = ["dep:moka"]
 file-logger = []
 
 [dependencies]
@@ -65,7 +63,6 @@ log = "0.4.29"
 chrono = { version = "0.4.43", features = ["serde"] }
 tempfile = "3.25.0"
 dirs = "6.0.0"
-moka = { version = "0.12.13", features = ["sync"], optional = true }
 unicode-normalization = "0.1.25"
 htmlescape = "0.3.1"
 syntect = { version = "5.3.0", optional = true }
