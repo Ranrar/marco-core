@@ -5,7 +5,7 @@ This project follows **Semantic Versioning** and uses the **Keep a Changelog** f
 
 Version scheme note: `marco-core` and `marco-shared` follow independent semver from the application binaries (marco/polo). The library tracks API stability for crates.io consumers; breaking API changes increment the major version.
 
-## [Unreleased]
+## [1.1.0] - 2026-05-08
 
 ### Removed
 
@@ -43,16 +43,15 @@ compile-time features:
 the previous per-thread values on return or panic (RAII, thread-local).
 `parse(input)` is unchanged and continues to enable all options.
 
-#### Compile-time feature flags — nine optional feature gates
+#### Compile-time feature flags — eight optional feature gates
 
-`Cargo.toml` now declares a `[features]` table with nine flags, all on by default:
+`Cargo.toml` now declares a `[features]` table with eight flags, all on by default:
 
 | Feature | Gates |
 |---|---|
 | `render-math` | KaTeX math rendering (`dep:katex-rs`) |
 | `render-diagrams` | Mermaid diagram rendering (`dep:mermaid-rs-renderer`) |
 | `render-syntax-highlighting` | syntect code highlighting (`dep:syntect`) |
-| `cache` | `ParserCache`, `parse_to_html`, `parse_to_html_cached` (`dep:moka`) |
 | `file-logger` | `SimpleFileLogger`, log rotation, log-path helpers |
 | `intelligence-highlights` | `MarkdownIntelligenceProvider::highlights` (implies `render-syntax-highlighting`) |
 | `intelligence-diagnostics` | `::diagnostics` and the analysis sub-module |
@@ -60,7 +59,7 @@ the previous per-thread values on return or panic (RAII, thread-local).
 | `intelligence-hover` | `::hover` and `::get_position_span` |
 
 Building with `--no-default-features` produces a minimal parser + renderer with
-no optional dependencies. All 26 test suites pass in both configurations.
+no optional dependencies. All 25 test suites pass in both configurations.
 Test files that exercise optional APIs are gated with `#![cfg(feature = "...")]`.
 
 #### `marco-core-raw` perf-lab engine adapter
@@ -194,7 +193,6 @@ suffix pattern, replacing the previous mixed `*_integration.rs` naming.
 | `marco_inline_footnotes_integration.rs` | `marco_inline_footnotes_it.rs` |
 | `marco_sliders_integration.rs` | `marco_sliders_it.rs` |
 | `marco_tab_blocks_integration.rs` | `marco_tab_blocks_it.rs` |
-| `parser_cache_integration.rs` | `parser_cache_it.rs` |
 | `platform_mentions_integration.rs` | `platform_mentions_it.rs` |
 | `sanitize_input_integration.rs` | `sanitize_input_it.rs` |
 
@@ -226,11 +224,6 @@ to match the relocated fixture directory.
 Added `#[cfg(test)]` smoke tests for file logger initialisation; editorial
 doc-comments clarified platform-specific paths to avoid editor-specific
 references.
-
-#### `src/logic/cache.rs` — smoke tests added
-Added smoke tests: `smoke_test_file_cache_invalidate_file_removes_entry` and
-`smoke_test_cached_read_to_string_returns_file_contents` /
-`smoke_test_cached_read_to_string_errors_for_missing_file`.
 
 #### CI workflows — reshaped for standalone library
 `ci-linux.yml` installs only `pkg-config` + `libfontconfig-dev`, runs
