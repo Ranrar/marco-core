@@ -23,7 +23,7 @@ cargo test --locked
 | `src/parser/` | Grammar output → AST builders |
 | `src/render/` | AST → HTML emitter |
 | `src/intelligence/` | Highlights, diagnostics, completions, hover, TOC |
-| `src/logic/` | UTF-8 sanitize, cache, logger |
+| `src/logic/` | UTF-8 sanitization, text completion, logging |
 | `tools/` | Developer tools (not published): marco-ast CLI, perf-lab benchmarking |
 
 Naming convention for grammar/parser modules:

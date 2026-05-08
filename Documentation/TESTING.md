@@ -124,7 +124,6 @@ the constant — never lower it without a documented reason.
 | `marco_inline_footnotes_it.rs` | 4 | Inline footnotes |
 | `marco_sliders_it.rs` | 3 | Slider blocks (`@slidestart` / `@slideend`) |
 | `marco_tab_blocks_it.rs` | 3 | Tab blocks (`:::tab` / `@tab`) |
-| `parser_cache_it.rs` | 3 | AST and HTML caching |
 | `platform_mentions_it.rs` | 3 | Platform mentions (`@user[github]`) |
 | `sanitize_input_it.rs` | 4 | UTF-8 sanitization |
 

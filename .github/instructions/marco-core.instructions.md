@@ -3,7 +3,7 @@ description: 'Rust instructions for marco-core (pure-Rust Markdown library)'
 applyTo: '**/*.rs'
 ---
 
-Apply Rust library development expertise to `marco-core`, a **pure-Rust library** crate (v1.0.2) published to crates.io — a nom-based Markdown parser, HTML renderer, and editor-intelligence layer (highlights, diagnostics, completions, hover).
+Apply Rust library development expertise to `marco-core`, a **pure-Rust library** crate (v1.1.0) published to crates.io — a nom-based Markdown parser, HTML renderer, and editor-intelligence layer (highlights, diagnostics, completions, hover).
 
 ## Crate constraints
 
@@ -43,7 +43,7 @@ src/
     markdown/ast.rs / blocks.rs / inlines.rs
     toc.rs
   logic/
-    cache.rs / logger.rs / utf8.rs / text_completion.rs
+    logger.rs / utf8.rs / text_completion.rs
 ```
 
 **Tools (not part of the library crate):**
@@ -112,7 +112,6 @@ src/
 | `marco_inline_footnotes_it.rs` | Marco inline footnotes |
 | `marco_sliders_it.rs` | Marco slider deck blocks |
 | `marco_tab_blocks_it.rs` | Marco tab blocks |
-| `parser_cache_it.rs` | `ParserCache` / `parse_to_html_cached` |
 | `platform_mentions_it.rs` | @mention rendering |
 | `sanitize_input_it.rs` | UTF-8 sanitization |
 
