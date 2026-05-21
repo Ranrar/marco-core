@@ -1,0 +1,78 @@
+name: Crates.io publish preflight
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [Cargo.toml]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  cratesio-update-check:
+    name: Crates.io update preflight
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain (pinned)
+        id: toolchain
+        uses: dtolnay/rust-toolchain@1.94.1
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-cratesio-preflight-${{ steps.toolchain.outputs.cachekey }}-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config libfontconfig-dev
+
+      - name: Show crate version
+        run: |
+          set -euo pipefail
+          crate_version="$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')"
+          echo "Validating marco-core version for crates.io update: $crate_version (ref: ${GITHUB_REF_NAME:-manual})"
+
+      - name: Validate version (format + crates.io uniqueness)
+        run: |
+          set -euo pipefail
+
+          crate_name="$(grep '^name' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')"
+          crate_version="$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')"
+
+          if ! [[ "$crate_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error title=Invalid crate version::Cargo.toml version '$crate_version' is not a valid semver-like version."
+            echo "Update Cargo.toml to a valid version (example: 1.0.3 or 1.1.0-rc.1)."
+            exit 1
+          fi
+
+          published_versions="$(curl -fsSL -H "User-Agent: marco-core-ci/preflight (github.com/Ranrar/marco-core)" "https://crates.io/api/v1/crates/${crate_name}/versions")"
+          if echo "$published_versions" | grep -q '"num":"'"$crate_version"'"'; then
+            echo "::error title=Version already published::${crate_name} ${crate_version} already exists on crates.io."
+            echo "Bump Cargo.toml version before releasing an update."
+            exit 1
+          fi
+
+          echo "Version check passed: ${crate_name} ${crate_version} is not yet published."
+
+      - name: Verify (test + clippy)
+        run: |
+          cargo test --locked
+          cargo clippy --all-targets --locked
+
+      - name: Package (dry-run check)
+        run: cargo publish --dry-run --locked
