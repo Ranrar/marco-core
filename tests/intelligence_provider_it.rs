@@ -56,7 +56,7 @@ fn test_intelligence_provider_diagnostics_with_options_filters_by_severity() {
 
     // Produce a document that triggers at least a warning-level diagnostic
     // (bare URL without autolink formatting is a common warning).
-    let md = "Visit http://example.com for more.\n";
+    let md = "Visit https://example.com for more.\n";
     let doc = parse(md).expect("parse failed");
 
     let mut provider = MarkdownIntelligenceProvider::new();
