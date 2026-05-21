@@ -1,9 +1,7 @@
 name: Publish marco-core to crates.io
 
 on:
-  push:
-    tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+*'
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
@@ -39,17 +37,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             build-essential pkg-config libfontconfig-dev
-
-      - name: Validate tag matches Cargo.toml version
-        run: |
-          set -euo pipefail
-          crate_version="$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')"
-          tag_version="${GITHUB_REF_NAME#v}"
-          if [[ "$crate_version" != "$tag_version" ]]; then
-            echo "::error title=Version mismatch::Tag ${GITHUB_REF_NAME} does not match Cargo.toml version ${crate_version}."
-            exit 1
-          fi
-          echo "Tag and Cargo.toml version match: ${crate_version}"
 
       - name: Validate version not already published
         run: |

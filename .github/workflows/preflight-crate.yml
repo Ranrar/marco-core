@@ -1,10 +1,9 @@
 name: Crates.io publish preflight
 
 on:
-  workflow_dispatch:
   push:
     branches: [main]
-    paths: [Cargo.toml]
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
