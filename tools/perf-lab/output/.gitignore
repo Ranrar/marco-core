@@ -4,6 +4,5 @@
 *.csv
 *.md
 
-# Keep sentinel files and the baseline manifest
+# Keep sentinel files
 !.gitkeep
-!baseline/workload-manifest-v1.json
