@@ -3,7 +3,7 @@
 //! Handles conversion of fenced code blocks (```, ~~~) with optional language
 //! from grammar layer to parser AST representation.
 
-use super::shared::{to_parser_span, GrammarSpan};
+use super::shared::{opt_span, GrammarSpan};
 use crate::parser::ast::{Node, NodeKind};
 
 /// Parse a fenced code block into an AST node.
@@ -23,21 +23,21 @@ use crate::parser::ast::{Node, NodeKind};
 /// assert!(matches!(node.kind, NodeKind::CodeBlock { .. }));
 /// ```
 pub fn parse_fenced_code_block(language: Option<String>, content: GrammarSpan) -> Node {
-    let span = to_parser_span(content);
+    let span = opt_span(content);
     let code = content.fragment().to_string();
 
     // Detect Mermaid diagrams (```mermaid ... ```)
     if let Some(ref lang) = language {
-        if lang.eq_ignore_ascii_case("mermaid") {
+        if crate::parser::shared::parse_diagrams_enabled() && lang.eq_ignore_ascii_case("mermaid") {
             return Node {
                 kind: NodeKind::MermaidDiagram { content: code },
-                span: Some(span),
+                span,
                 children: Vec::new(),
             };
         }
 
         // Detect math blocks (```math ... ```)
-        if lang.eq_ignore_ascii_case("math") {
+        if crate::parser::shared::parse_math_enabled() && lang.eq_ignore_ascii_case("math") {
             // Strip surrounding $$ delimiters if present
             let math_content = code.trim();
             let content = if math_content.starts_with("$$") && math_content.ends_with("$$") {
@@ -50,7 +50,7 @@ pub fn parse_fenced_code_block(language: Option<String>, content: GrammarSpan) -
 
             return Node {
                 kind: NodeKind::DisplayMath { content },
-                span: Some(span),
+                span,
                 children: Vec::new(),
             };
         }
@@ -59,7 +59,7 @@ pub fn parse_fenced_code_block(language: Option<String>, content: GrammarSpan) -
     // Regular code block
     Node {
         kind: NodeKind::CodeBlock { language, code },
-        span: Some(span),
+        span,
         children: Vec::new(),
     }
 }

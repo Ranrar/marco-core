@@ -12,8 +12,11 @@ use std::collections::HashMap;
 /// A single entry in the extracted Table of Contents.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TocEntry {
+    /// Heading level (1..=6).
     pub level: u8,
+    /// Raw heading text.
     pub text: String,
+    /// Generated anchor slug.
     pub slug: String,
     /// 1-based source line number of the heading (from the AST span), or 0 when unknown.
     pub line: usize,

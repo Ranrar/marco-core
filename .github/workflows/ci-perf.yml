@@ -1,0 +1,178 @@
+# ci-perf.yml — Performance benchmarks and regression gating
+#
+# Stage A (non-blocking): runs on every push to main, uploads artifacts only.
+# Stage B (blocking):     runs on pull_request, fails if regressions are found.
+#
+# The baseline artifact used for gating is the most recent artifact uploaded
+# by Stage A from the main branch.  When no baseline artifact is found (first
+# run, or after the artifact TTL expires) Stage B skips the gate gracefully.
+
+name: CI (Performance)
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  # Thresholds (%) used by `perf-lab regression`
+  PERF_WARN_THRESHOLD: "10"
+  PERF_FAIL_THRESHOLD: "20"
+  # Minimum regressions to trigger a hard failure
+  PERF_MIN_FAILURES: "2"
+
+jobs:
+  # ────────────────────────────────────────────────────────────────────────────
+  # Stage A — collect + archive artifacts (non-blocking, main branch only)
+  # ────────────────────────────────────────────────────────────────────────────
+  bench-stage-a:
+    name: "Perf: Stage A – collect artifacts"
+    runs-on: ubuntu-24.04
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Rust toolchain (pinned)
+        id: toolchain
+        uses: dtolnay/rust-toolchain@1.94.1
+
+      - name: Cache cargo
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            tools/perf-lab/target
+          key: cargo-perf-${{ steps.toolchain.outputs.cachekey }}-${{ hashFiles('tools/perf-lab/Cargo.lock') }}
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config libfontconfig-dev
+
+      - name: Build perf-lab (release)
+        run: cargo build --manifest-path tools/perf-lab/Cargo.toml --release
+
+      - name: Run benchmark (all workloads, e2e, marco-core)
+        run: |
+          tools/perf-lab/target/release/perf-lab bench \
+            --engine marco-core \
+            --mode e2e \
+            --iterations 30 \
+            2>&1
+
+      - name: Run benchmark (parse mode, marco-core)
+        run: |
+          tools/perf-lab/target/release/perf-lab bench \
+            --engine marco-core \
+            --mode parse \
+            --iterations 30 \
+            2>&1
+
+      - name: Collect latest summary artifact
+        run: |
+          # Find the most recent bench artifact in summary dir
+          LATEST=$(ls -1t tools/perf-lab/output/summary/bench-*.json 2>/dev/null | head -1)
+          if [[ -z "$LATEST" ]]; then
+            echo "No bench artifact found — skipping upload"
+            exit 0
+          fi
+          mkdir -p ci-artifacts
+          cp "$LATEST" ci-artifacts/bench-main-latest.json
+          echo "Uploading: $LATEST"
+
+      - name: Upload benchmark artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-bench-main-${{ github.sha }}
+          path: ci-artifacts/bench-main-latest.json
+          retention-days: 30
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Stage B — regression gate (blocking, pull_request only)
+  # ────────────────────────────────────────────────────────────────────────────
+  bench-stage-b:
+    name: "Perf: Stage B – regression gate"
+    runs-on: ubuntu-24.04
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Rust toolchain (pinned)
+        id: toolchain
+        uses: dtolnay/rust-toolchain@1.94.1
+
+      - name: Cache cargo
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            tools/perf-lab/target
+          key: cargo-perf-${{ steps.toolchain.outputs.cachekey }}-${{ hashFiles('tools/perf-lab/Cargo.lock') }}
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config libfontconfig-dev
+
+      - name: Build perf-lab (release)
+        run: cargo build --manifest-path tools/perf-lab/Cargo.toml --release
+
+      - name: Run benchmark on PR branch (e2e)
+        run: |
+          tools/perf-lab/target/release/perf-lab bench \
+            --engine marco-core \
+            --mode e2e \
+            --iterations 20 \
+            2>&1
+
+      - name: Collect PR benchmark artifact
+        run: |
+          LATEST=$(ls -1t tools/perf-lab/output/summary/bench-*.json 2>/dev/null | head -1)
+          if [[ -z "$LATEST" ]]; then
+            echo "ERROR: no bench artifact produced" >&2
+            exit 1
+          fi
+          mkdir -p ci-artifacts
+          cp "$LATEST" ci-artifacts/bench-pr.json
+          echo "PR artifact: $LATEST"
+
+      - name: Download main-branch baseline artifact
+        id: download_baseline
+        uses: actions/download-artifact@v4
+        with:
+          name: perf-bench-main-${{ github.event.pull_request.base.sha }}
+          path: ci-artifacts/baseline/
+        continue-on-error: true
+
+      - name: Run regression gate
+        run: |
+          PR_JSON="ci-artifacts/bench-pr.json"
+          BASELINE_JSON="ci-artifacts/baseline/bench-main-latest.json"
+
+          if [[ ! -f "$BASELINE_JSON" ]]; then
+            echo "No baseline artifact found for ${{ github.event.pull_request.base.sha }} — skipping gate."
+            echo "This is expected on first run or after artifact expiry."
+            exit 0
+          fi
+
+          tools/perf-lab/target/release/perf-lab regression \
+            --baseline "$BASELINE_JSON" \
+            --current  "$PR_JSON" \
+            --warn-threshold "$PERF_WARN_THRESHOLD" \
+            --fail-threshold "$PERF_FAIL_THRESHOLD" \
+            --min-failures   "$PERF_MIN_FAILURES"
+
+      - name: Upload PR benchmark artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-bench-pr-${{ github.event.pull_request.number }}-${{ github.sha }}
+          path: ci-artifacts/bench-pr.json
+          retention-days: 14

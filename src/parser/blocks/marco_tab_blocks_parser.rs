@@ -1,16 +1,16 @@
-//! Marco extended tab blocks parser - converts grammar output to AST nodes
+//! Extended tab-block parser - converts grammar output to AST nodes.
 //!
-//! Converts `grammar::blocks::marco_tab_blocks::MarcoTabBlock` into:
+//! Converts the grammar-level tab block into:
 //! - `NodeKind::TabGroup`
 //! - `NodeKind::TabItem { title }`
 //!
 //! Each tab panel's raw markdown is recursively parsed as block nodes.
 
-use super::shared::{to_parser_span, to_parser_span_range, GrammarSpan};
+use super::shared::{opt_span, opt_span_range, GrammarSpan};
 use crate::grammar::blocks::marco_tab_blocks::MarcoTabBlock;
 use crate::parser::ast::{Document, Node, NodeKind};
 
-/// Parse a Marco tab block into an AST node.
+/// Parse an extended tab block into an AST node.
 ///
 /// # Arguments
 /// * `block` - Grammar output for the full tab container
@@ -27,11 +27,11 @@ pub fn parse_marco_tab_block<F>(
 where
     F: FnMut(&str, usize) -> Result<Document, Box<dyn std::error::Error>>,
 {
-    let group_span = to_parser_span_range(full_start, full_end);
+    let group_span = opt_span_range(full_start, full_end);
 
     let mut group = Node {
         kind: NodeKind::TabGroup,
-        span: Some(group_span),
+        span: group_span,
         children: Vec::new(),
     };
 
@@ -49,7 +49,7 @@ where
         group.children.push(Node {
             kind: NodeKind::TabItem { title: item.title },
             // The grammar currently only provides a precise span for the panel body.
-            span: Some(to_parser_span(item.content)),
+            span: opt_span(item.content),
             children: panel_doc.children,
         });
     }

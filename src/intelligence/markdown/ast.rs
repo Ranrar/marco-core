@@ -4,7 +4,9 @@ pub use crate::parser::{Document, Node, NodeKind, Position, Span};
 
 /// Alias types used by the intelligence boundary.
 pub type MarkdownDocument = Document;
+/// Alias for a Markdown AST node used by intelligence helpers.
 pub type MarkdownNode = Node;
+/// Alias for Markdown AST node kinds used by intelligence helpers.
 pub type MarkdownNodeKind = NodeKind;
 
 /// Return this node's span if available.

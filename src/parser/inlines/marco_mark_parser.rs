@@ -1,6 +1,6 @@
-//! Mark/highlight parser (Marco extension)
+//! Mark/highlight parser (extended syntax).
 
-use super::shared::{to_parser_span_range, GrammarSpan};
+use super::shared::{opt_span_range, GrammarSpan};
 use crate::grammar::inlines as grammar;
 use crate::parser::ast::{Node, NodeKind};
 use nom::IResult;
@@ -10,7 +10,7 @@ pub fn parse_mark(input: GrammarSpan) -> IResult<GrammarSpan, Node> {
     let start = input;
     let (rest, content) = grammar::mark(input)?;
 
-    let span = to_parser_span_range(start, rest);
+    let span = opt_span_range(start, rest);
 
     let children = match crate::parser::inlines::parse_inlines_from_span(content) {
         Ok(children) => children,
@@ -24,7 +24,7 @@ pub fn parse_mark(input: GrammarSpan) -> IResult<GrammarSpan, Node> {
         rest,
         Node {
             kind: NodeKind::Mark,
-            span: Some(span),
+            span,
             children,
         },
     ))

@@ -1,6 +1,6 @@
-/// Base structural stylesheet for the Marco HTML preview.
+/// Base structural stylesheet for the viewer HTML preview.
 ///
-/// This contains ALL HTML element rules and Marco component rules.
+/// This contains ALL HTML element rules and viewer component rules.
 /// It references CSS custom properties (set by the theme token files)
 /// with safe fallback values so it works even if a variable is not defined.
 ///
@@ -45,8 +45,8 @@ body {
 }
 
 body {
-    --marco-task-primary: var(--link-color, #0066cc);
-    --marco-task-accent:  var(--link-hover, #0052a3);
+    --mc-task-primary: var(--link-color, #0066cc);
+    --mc-task-accent:  var(--link-hover, #0052a3);
 }
 
 /* ── Headings ─────────────────────────────────────────────────────────────── */
@@ -58,7 +58,7 @@ h1, h2, h3, h4, h5, h6 {
     /* Provide a real computed color for child elements (anchor icons, etc.). */
     color: var(--heading-color, #1a1a1a);
     /* Gradient: when --heading-gradient-end equals --heading-color the gradient
-       is invisible (solid colour). Marco theme sets it to a pink/purple accent. */
+       is invisible (solid colour). The viewer theme can set a custom accent. */
     background: linear-gradient(
         45deg,
         var(--heading-color, #1a1a1a),
@@ -268,12 +268,12 @@ pre code {
 .nested-code-block .code-content p:last-child  { margin-bottom: 0; }
 
 /* ── Code copy button ─────────────────────────────────────────────────────── */
-.marco-code-block-wrapper {
+.0 {
     position: relative;
     margin: 1rem 0;
 }
 
-.marco-code-copy-btn {
+.marco-copy-btn {
     position: absolute;
     top: 0.4rem;
     right: 0.4rem;
@@ -291,11 +291,11 @@ pre code {
     z-index: 10;
 }
 
-.marco-code-block-wrapper:hover .marco-code-copy-btn {
+.0:hover .marco-copy-btn {
     opacity: 1;
 }
 
-.marco-code-copy-btn svg {
+.marco-copy-btn svg {
     width: 1.1em;
     height: 1.1em;
     display: block;
@@ -303,17 +303,17 @@ pre code {
     fill: none;
 }
 
-.marco-code-copy-btn:hover {
+.marco-copy-btn:hover {
     background-color: var(--bg-secondary, #f5f5f5);
     color: var(--link-color, #0066cc);
     opacity: 1;
 }
 
-.marco-code-copy-btn:active {
+.marco-copy-btn:active {
     background-color: var(--bg-code, #eee);
 }
 
-.marco-code-copy-btn.copied {
+.marco-copy-btn.copied {
     color: #1a7f37;
     background-color: var(--bg-code, #eee);
     opacity: 1;
@@ -346,7 +346,7 @@ li {
 li + li { margin-top: 0.15rem; }
 
 /* ── Task lists ───────────────────────────────────────────────────────────── */
-.task-list-item {
+.marco-task-list-item {
     list-style-type: none;
     margin-left: -1.5rem;
     padding-left: 0;
@@ -356,7 +356,7 @@ li + li { margin-top: 0.15rem; }
 }
 
 .marco-task-checkbox,
-.task-list-item .task-list-item-checkbox {
+.marco-task-list-item .marco-task-checkbox {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -368,25 +368,25 @@ li + li { margin-top: 0.15rem; }
 }
 
 .marco-task-checkbox .marco-task-icon,
-.task-list-item .task-list-item-checkbox .marco-task-icon {
+.marco-task-list-item .marco-task-checkbox .marco-task-icon {
     width: 1.15em;
     height: 1.15em;
     flex: 0 0 auto;
 }
 
 .marco-task-checkbox.checked,
-.task-list-item .task-list-item-checkbox.checked {
-    color: var(--marco-task-primary, var(--link-color, #0066cc));
+.marco-task-list-item .marco-task-checkbox.checked {
+    color: var(--mc-task-primary, var(--link-color, #0066cc));
 }
 
 .marco-task-checkbox.checked .marco-task-check,
-.task-list-item .task-list-item-checkbox.checked .marco-task-check {
-    stroke: var(--marco-task-accent, var(--link-hover, #0052a3));
+.marco-task-list-item .marco-task-checkbox.checked .marco-task-check {
+    stroke: var(--mc-task-accent, var(--link-hover, #0052a3));
 }
 
-.task-list-item input[type="checkbox"] {
+.marco-task-list-item input[type="checkbox"] {
     margin-right: 0.4rem;
-    accent-color: var(--marco-task-primary, var(--link-color, #0066cc));
+    accent-color: var(--mc-task-primary, var(--link-color, #0066cc));
 }
 
 /* ── Definition lists ─────────────────────────────────────────────────────── */

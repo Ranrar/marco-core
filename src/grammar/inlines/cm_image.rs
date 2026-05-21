@@ -2,6 +2,7 @@
 use super::Span;
 use nom::{IResult, Input};
 
+/// Parse an inline image and return `(alt, url, optional_title)` spans.
 pub fn image(input: Span) -> IResult<Span, (Span, Span, Option<Span>)> {
     log::debug!("Parsing image at: {:?}", input.fragment());
     let start_input = input;

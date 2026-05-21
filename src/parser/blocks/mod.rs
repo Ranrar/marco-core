@@ -1,31 +1,42 @@
-// Block-level parser modules
-//
-// This module contains individual block parser functions that convert
-// grammar output into AST nodes with proper positioning.
-//
-// Phase 3: Parser module extraction - COMPLETE
+//! Block-level parser modules.
+//!
+//! This layer converts block grammar outputs into AST nodes with positions.
 
-// Shared utilities
+/// Shared block parser utilities.
 pub mod shared;
 
-// Individual block parsers
+/// CommonMark blockquote parser.
 pub mod cm_blockquote_parser;
+/// CommonMark fenced code block parser.
 pub mod cm_fenced_code_block_parser;
+/// CommonMark heading parsers.
 pub mod cm_heading_parser;
+/// CommonMark HTML block parser.
 pub mod cm_html_blocks_parser;
+/// CommonMark indented code block parser.
 pub mod cm_indented_code_block_parser;
+/// CommonMark link reference definition parser.
 pub mod cm_link_reference_parser;
+/// CommonMark list parser.
 pub mod cm_list_parser;
+/// CommonMark paragraph parser.
 pub mod cm_paragraph_parser;
+/// CommonMark thematic break parser.
 pub mod cm_thematic_break_parser;
+/// GFM alert/admonition post-processing.
 pub mod gfm_admonitions;
+/// GFM footnote definition parser.
 pub mod gfm_footnote_definition_parser;
+/// GFM table parser.
 pub mod gfm_table_parser;
+/// Extended headerless table parser.
 pub mod marco_headerless_table_parser;
+/// Extended slide deck parser.
 pub mod marco_sliders_parser;
+/// Extended tab block parser.
 pub mod marco_tab_blocks_parser;
 
-// Re-export shared utilities
+/// Re-export shared block parser utilities.
 pub use shared::{dedent_list_item_content, to_parser_span, to_parser_span_range, GrammarSpan};
 
 use super::ast::Document;
@@ -448,7 +459,7 @@ fn parse_blocks_internal(
             continue;
         }
 
-        // Try parsing Marco sliders (extension)
+        // Try parsing extended slide decks.
         // Must come BEFORE setext heading. Otherwise, the internal `---` / `--`
         // separators can be consumed as setext underlines and the deck is lost.
         if state.allow_sliders {
@@ -504,10 +515,10 @@ fn parse_blocks_internal(
         // Try parsing GFM pipe table (extension)
         // Must come BEFORE paragraph so tables aren't consumed as plain text.
         //
-        // Also try parsing Marco "headerless" pipe tables (delimiter-first).
+        // Also try parsing extended "headerless" pipe tables (delimiter-first).
         // Must come BEFORE paragraph for the same reason.
         let headerless_table_start = remaining;
-        if let Ok((rest, table)) = grammar::marco_headerless_table(remaining) {
+        if let Ok((rest, table)) = grammar::headerless_table(remaining) {
             nodes.push(marco_headerless_table_parser::parse_marco_headerless_table(
                 table,
                 headerless_table_start,
@@ -524,7 +535,7 @@ fn parse_blocks_internal(
             continue;
         }
 
-        // Try parsing Marco extended tab blocks (extension)
+        // Try parsing extended tab blocks.
         // Must come BEFORE paragraph so the container isn't consumed as plain text.
         if state.allow_tab_blocks {
             let tab_start = remaining;
@@ -739,7 +750,7 @@ fn parse_extended_definition_list<'a>(
                 log::warn!("Failed to parse inline elements in definition term: {}", e);
                 vec![Node {
                     kind: NodeKind::Text(term_taken_span.fragment().to_string()),
-                    span: Some(crate::parser::shared::to_parser_span(term_taken_span)),
+                    span: crate::parser::shared::opt_span(term_taken_span),
                     children: Vec::new(),
                 }]
             }
@@ -747,10 +758,7 @@ fn parse_extended_definition_list<'a>(
 
         children.push(Node {
             kind: NodeKind::DefinitionTerm,
-            span: Some(crate::parser::shared::to_parser_span_range(
-                term_start_span,
-                term_after_span,
-            )),
+            span: crate::parser::shared::opt_span_range(term_start_span, term_after_span),
             children: term_children,
         });
 
@@ -837,10 +845,7 @@ fn parse_extended_definition_list<'a>(
             let dd_end_span = input.take_from(def_block_end);
             children.push(Node {
                 kind: NodeKind::DefinitionDescription,
-                span: Some(crate::parser::shared::to_parser_span_range(
-                    dd_start_span,
-                    dd_end_span,
-                )),
+                span: crate::parser::shared::opt_span_range(dd_start_span, dd_end_span),
                 children: def_children,
             });
 
@@ -872,12 +877,12 @@ fn parse_extended_definition_list<'a>(
     }
 
     let (rest, _taken) = input.take_split(cursor);
-    let span = crate::parser::shared::to_parser_span_range(input, rest);
+    let span = crate::parser::shared::opt_span_range(input, rest);
     Some((
         rest,
         Node {
             kind: NodeKind::DefinitionList,
-            span: Some(span),
+            span,
             children,
         },
     ))

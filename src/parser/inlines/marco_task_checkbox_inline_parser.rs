@@ -1,4 +1,4 @@
-//! Marco inline task checkbox parser
+//! Inline task checkbox parser (extended syntax).
 //!
 //! Parses inline task checkbox markers that appear *mid-paragraph*, e.g.:
 //! `Do this [ ] today` or `Done? [x], great.`
@@ -7,7 +7,7 @@
 //! - We keep this conservative to avoid breaking CommonMark link syntax.
 //! - Boundary rules (previous character) are handled by the caller.
 
-use super::shared::{to_parser_span, GrammarSpan};
+use super::shared::{opt_span, GrammarSpan};
 use crate::parser::ast::{Node, NodeKind};
 use nom::bytes::complete::take;
 use nom::IResult;
@@ -70,7 +70,7 @@ pub fn parse_task_checkbox_inline(input: GrammarSpan) -> IResult<GrammarSpan, No
         rest,
         Node {
             kind: NodeKind::TaskCheckboxInline { checked },
-            span: Some(to_parser_span(taken)),
+            span: opt_span(taken),
             children: Vec::new(),
         },
     ))

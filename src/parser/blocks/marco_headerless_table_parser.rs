@@ -1,6 +1,6 @@
-//! Marco headerless table parser - converts grammar output to AST nodes
+//! Extended headerless-table parser - converts grammar output to AST nodes.
 //!
-//! Converts `grammar::blocks::marco_headerless_table::MarcoHeaderlessTableBlock` into the
+//! Converts the grammar-level headerless table block into the
 //! structured table AST representation:
 //! - `NodeKind::Table { alignments }`
 //! - `NodeKind::TableRow { header: false }`
@@ -12,7 +12,7 @@ use crate::grammar::blocks::gfm_table::split_pipe_row_cells;
 use crate::grammar::blocks::marco_headerless_table::MarcoHeaderlessTableBlock;
 use crate::parser::ast::{Node, NodeKind, TableAlignment};
 
-/// Parse a Marco headerless table block into an AST node.
+/// Parse an extended headerless table block into an AST node.
 ///
 /// `full_start..full_end` should cover the entire matched table construct (as
 /// returned by the block-level grammar function) so spans/highlighting can
@@ -22,7 +22,7 @@ pub fn parse_marco_headerless_table<'a>(
     full_start: GrammarSpan<'a>,
     full_end: GrammarSpan<'a>,
 ) -> Node {
-    let span = crate::parser::shared::to_parser_span_range(full_start, full_end);
+    let span = crate::parser::shared::opt_span_range(full_start, full_end);
 
     let delimiter_cells = split_pipe_row_cells(table.delimiter_line);
 
@@ -48,7 +48,7 @@ pub fn parse_marco_headerless_table<'a>(
 
     Node {
         kind: NodeKind::Table { alignments },
-        span: Some(span),
+        span,
         children: rows,
     }
 }
@@ -63,7 +63,7 @@ mod tests {
         let input = GrammarSpan::new("|:--|--:|:--:|\n| 1 | 2 | 3 |\n| 4 | 5 | 6 |\n");
         let start = input;
         let (rest, table) =
-            grammar::marco_headerless_table(input).expect("should parse headerless table");
+            grammar::headerless_table(input).expect("should parse headerless table");
 
         let node = parse_marco_headerless_table(table, start, rest);
 

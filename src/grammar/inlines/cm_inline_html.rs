@@ -3,6 +3,7 @@ use super::Span;
 use nom::IResult;
 use nom::{Input, Parser};
 
+/// Parse a whitelisted inline HTML start/end tag fragment.
 pub fn inline_html(input: Span) -> IResult<Span, Span> {
     use nom::{
         bytes::complete::{tag, take_while},

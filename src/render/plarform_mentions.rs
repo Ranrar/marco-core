@@ -4,9 +4,13 @@
 //! `(platform, username)` pair into a profile URL.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Metadata for a supported `@platform(username)` target.
 pub struct MentionPlatform {
+    /// Canonical lowercase platform key (for example `github`).
     pub key: &'static str,
+    /// Human-readable platform label.
     pub label: &'static str,
+    /// Optional inline SVG icon.
     pub svg: Option<&'static str>,
 }
 

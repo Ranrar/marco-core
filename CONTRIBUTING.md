@@ -1,22 +1,34 @@
 # Contributing to marco-core
 
-Thanks for your interest in `marco-core`. This document covers how to set up,
-test, and submit changes.
+Thanks for your interest in contributing. This document covers the basics; detailed
+guidance is in the [Documentation](Documentation/) folder.
 
-## Crate scope
+## Before you start
 
 `marco-core` is a **standalone, pure-Rust library** published to crates.io.
-It must remain:
 
-- **Library only** — no `main.rs`, no binaries, no GUI dependencies (no GTK,
-  SourceView, WebKit).
-- **Self-contained** — no `marco`, `marco-shared`, or `polo` crates here.
-- **API-stable** — anything re-exported from `src/lib.rs` follows semver.
+- **Library only** — no binaries, no GUI dependencies (GTK, WebKit, etc.)
+- **Self-contained** — no `marco`, `marco-shared`, or `polo` crates
+- **API-stable** — anything in `src/lib.rs` follows semver
 
-If your change requires editor or UI code, open it against the consuming
-editor at [Ranrar/Marco](https://github.com/Ranrar/Marco) instead.
+For editor or UI changes, open an issue against [Marco](https://github.com/Ranrar/Marco) instead.
 
-## Development setup
+## Quick workflow
+
+1. **Open an issue first** for non-trivial changes (design discussion).
+2. Fork and create a topic branch.
+3. Make focused commits.
+4. Add or update tests.
+5. Run checks locally:
+   ```bash
+   cargo fmt --all --check
+   cargo clippy --all-targets --locked
+   cargo test --locked
+   ```
+6. Update `CHANGELOG.md` under `[Unreleased]` for user-visible changes.
+7. Open a pull request.
+
+## Setup & build
 
 ```bash
 git clone https://github.com/Ranrar/marco-core
@@ -25,91 +37,55 @@ cargo build
 cargo test --locked
 ```
 
-Stable Rust **1.94.1** is the pinned toolchain (matches CI). On Linux the only
-system package required is `libfontconfig-dev` (used by the math/diagram
-renderers).
+**Rust 1.94.1** (stable, pinned in CI).
 
-## Workflow
+## Detailed guides
 
-1. Open an issue for non-trivial changes so the design can be discussed first.
-2. Fork the repo and create a topic branch.
-3. Make small, focused commits.
-4. Add or update tests covering the change (see "Testing" below).
-5. Run the full check locally before pushing:
-   ```bash
-   cargo fmt --all --check
-   cargo clippy --all-targets --locked
-   cargo test  --locked
-   ```
-6. Update `CHANGELOG.md` under `[Unreleased]` for any user-visible change
-   (Keep a Changelog format: `Added` / `Changed` / `Fixed` / `Removed` /
-   `Security`).
-7. Open a pull request.
-
-## Module layout
-
-| Module           | Responsibility                                            |
-| ---------------- | --------------------------------------------------------- |
-| `grammar/`       | nom combinators that produce spans / tokens               |
-| `parser/`        | AST builders that consume grammar output                  |
-| `render/`        | AST → HTML emitter                                        |
-| `intelligence/`  | Highlights, diagnostics, completions, hover, TOC          |
-| `logic/`         | Pure-Rust support: cache, UTF-8 sanitize, logger          |
-
-Do not skip layers. Use the file-name prefix convention for new
-grammar/parser features:
-
-- `cm_*` — CommonMark spec feature
-- `gfm_*` — GitHub Flavored Markdown extension
-- `marco_*` — Marco-specific extension
+- **[Documentation/DEVELOPMENT.md](Documentation/DEVELOPMENT.md)** — Modules, coding rules, public API contracts
+- **[Documentation/TESTING.md](Documentation/TESTING.md)** — Test inventory, adding tests, spec fixtures
+- **[Documentation/TOOLS.md](Documentation/TOOLS.md)** — Developer tools (marco-ast, perf-lab)
 
 ## Coding rules
 
-- No panics in library code. Prefer `?`, `match`, or `.ok_or(...)` over
-  `unwrap()` / `expect()` outside tests.
-- Borrow over clone. Public APIs take `&str` / `&Document` unless ownership
-  is required.
-- No `unsafe` unless documented and tested.
-- No `println!` / `eprintln!` in library code — use the `log` crate.
-- OS gating uses only `#[cfg(target_os = "linux")]` /
-  `#[cfg(target_os = "windows")]`. Do not use `cfg(any(...))` /
-  `cfg(not(...))` for OS gating.
+- **No panics** — use `?`, `match`, or `.ok_or(...)` instead of `unwrap()`.
+- **Borrow over clone** — public APIs use `&str` / `&Document`, not owned values.
+- **No `unsafe`** unless documented and tested.
+- **No logging to stdout** — use the `log` crate or `SimpleFileLogger`.
+- **OS gating:** Use only `#[cfg(target_os = "linux")]` / `#[cfg(target_os = "windows")]`.
 
 ## Testing
 
-- Unit / smoke tests live next to the module under
-  `#[cfg(test)] mod tests { ... }`.
-- Integration tests live in `tests/*.rs` and exercise only the public API
-  re-exported from `src/lib.rs`.
-- A new grammar rule needs **both** a unit test in the grammar module **and**
-  an integration test under `tests/`.
-- A bug fix needs a regression test that fails before the fix and passes
-  after.
-- Run the CommonMark spec suite locally:
-  ```bash
-  MARCO_SPEC_VERBOSE=1 cargo test --test commonmark_spec_conformance
-  ```
-  If your change improves conformance, bump `MIN_COMMONMARK_PASS` in
-  `tests/commonmark_spec_conformance.rs` to the new measured baseline.
+- Unit tests live next to the code: `#[cfg(test)] mod tests { ... }`
+- Integration tests in `tests/` exercise the public API only
+- New grammar rule → needs both unit test **and** integration test
+- Bug fix → needs a regression test that fails before, passes after
+
+Run all tests:
+```bash
+cargo test --locked
+
+# CommonMark strict mode
+MARCO_SPEC_STRICT=1 cargo test --test commonmark_spec_it
+
+# Print failing spec examples
+MARCO_SPEC_VERBOSE=1 cargo test --test commonmark_spec_it
+```
+
+If your change improves spec conformance, bump `MIN_COMMONMARK_PASS` in
+`tests/commonmark_spec_it.rs` to the new measured baseline.
 
 ## Public API & semver
 
 The contract is `src/lib.rs`. Adding a new `pub use` is a minor bump;
-removing or changing one is a major bump. Discuss API additions in an issue
-first — the public surface is intentionally small.
+removing or changing one is a major bump.
 
-## Releasing
-
-Maintainer-only:
-
-1. Update `CHANGELOG.md` (`[Unreleased]` → versioned section).
-2. Bump `version` in `Cargo.toml` (no leading zeros in any version part).
-3. `cargo publish --dry-run --locked` to verify.
-4. Commit, tag `vX.Y.Z`, and push the tag — the
-   [`publish-crate.yml`](.github/workflows/publish-crate.yml) workflow
-   handles crates.io publication.
+Discuss API additions in an issue first — the public surface is intentionally small.
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under
-the [MIT License](LICENSE).
+By contributing, you agree your contributions will be licensed under the [MIT License](LICENSE).
+
+---
+
+**Questions?** Open an issue or check the [Documentation](Documentation/) folder.
+

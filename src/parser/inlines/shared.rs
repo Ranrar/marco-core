@@ -3,7 +3,9 @@
 //! This module provides helper functions used by all inline parser modules,
 //! primarily for converting between grammar spans and parser spans.
 
-pub use crate::parser::shared::{to_parser_span, to_parser_span_range, GrammarSpan};
+pub use crate::parser::shared::{
+    opt_span, opt_span_range, to_parser_span, to_parser_span_range, GrammarSpan,
+};
 
 // Re-export the canonical helpers from `crate::parser::shared` so inline parsers
 // can call `super::shared::to_parser_span(...)` as before.

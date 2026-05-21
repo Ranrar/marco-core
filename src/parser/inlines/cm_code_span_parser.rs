@@ -3,7 +3,7 @@
 //! Parses inline code spans (`` `code` ``) and converts them to CodeSpan nodes.
 //! This is the highest priority inline element to avoid conflicts with other syntax.
 
-use super::shared::{to_parser_span, GrammarSpan};
+use super::shared::{opt_span, GrammarSpan};
 use crate::grammar::inlines as grammar;
 use crate::parser::ast::{Node, NodeKind};
 use nom::IResult;
@@ -22,12 +22,12 @@ use nom::IResult;
 pub fn parse_code_span(input: GrammarSpan) -> IResult<GrammarSpan, Node> {
     let (rest, content) = grammar::code_span(input)?;
 
-    let span = to_parser_span(content);
+    let span = opt_span(content);
     let code = content.fragment().to_string();
 
     let node = Node {
         kind: NodeKind::CodeSpan(code),
-        span: Some(span),
+        span,
         children: Vec::new(),
     };
 

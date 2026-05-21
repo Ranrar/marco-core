@@ -1,16 +1,17 @@
-// AST node definitions: central representation consumed by renderer and intelligence
+//! AST node definitions consumed by parser, renderer, and intelligence layers.
 
 use crate::parser::Span;
 use std::collections::HashMap;
 
-// Link reference map: stores [label]: url definitions for later resolution
 #[derive(Debug, Clone, Default)]
+/// Map of normalized link reference labels to `(url, optional_title)`.
 pub struct ReferenceMap {
     // Key: normalized label (case-folded, whitespace collapsed), Value: (url, optional title)
     defs: HashMap<String, (String, Option<String>)>,
 }
 
 impl ReferenceMap {
+    /// Create an empty reference map.
     pub fn new() -> Self {
         Self::default()
     }
@@ -41,7 +42,16 @@ impl ReferenceMap {
 /// - Collapse consecutive whitespace to single space
 /// - Trim leading/trailing whitespace
 fn normalize_label(label: &str) -> String {
-    let collapsed = label.split_whitespace().collect::<Vec<_>>().join(" ");
+    // Build a whitespace-collapsed string directly without allocating a Vec.
+    let mut collapsed = String::with_capacity(label.len());
+    let mut first = true;
+    for word in label.split_whitespace() {
+        if !first {
+            collapsed.push(' ');
+        }
+        collapsed.push_str(word);
+        first = false;
+    }
 
     // NOTE:
     // Rust doesn't provide full Unicode case-folding in std. We apply
@@ -62,28 +72,37 @@ fn normalize_label(label: &str) -> String {
     out
 }
 
-// Root document node
 #[derive(Debug, Clone, Default)]
+/// Root parsed Markdown document.
 pub struct Document {
+    /// Top-level AST children in source order.
     pub children: Vec<Node>,
+    /// Collected link reference definitions.
     pub references: ReferenceMap,
 }
 
-// Generic AST node
 #[derive(Debug, Clone)]
+/// Generic AST node.
 pub struct Node {
+    /// Semantic node kind.
     pub kind: NodeKind,
+    /// Optional source span for this node.
     pub span: Option<Span>,
+    /// Child nodes for hierarchical constructs.
     pub children: Vec<Node>,
 }
 
 /// Table column alignment (GFM tables extension).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TableAlignment {
+    /// No explicit alignment.
     #[default]
     None,
+    /// Left-aligned column.
     Left,
+    /// Center-aligned column.
     Center,
+    /// Right-aligned column.
     Right,
 }
 
@@ -95,10 +114,15 @@ pub enum TableAlignment {
 /// `> body...`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AdmonitionKind {
+    /// Note admonition kind.
     Note,
+    /// Tip admonition kind.
     Tip,
+    /// Important admonition kind.
     Important,
+    /// Warning admonition kind.
     Warning,
+    /// Caution admonition kind.
     Caution,
 }
 
@@ -109,16 +133,20 @@ pub enum AdmonitionKind {
 ///   keeping the admonition title layout.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AdmonitionStyle {
+    /// GitHub alert style.
     Alert,
+    /// Quote-like neutral style.
     Quote,
 }
 
-// All node types
 #[derive(Debug, Clone)]
+/// All supported block and inline AST node kinds.
 pub enum NodeKind {
-    // Block-level
+    /// ATX or setext heading node.
     Heading {
+        /// Heading level, typically in range 1..=6.
         level: u8,
+        /// Plain heading text content.
         text: String,
         /// Explicit heading id, e.g. `### Title {#custom-id}`.
         ///
@@ -126,17 +154,27 @@ pub enum NodeKind {
         /// heading element.
         id: Option<String>,
     },
+    /// Paragraph container.
     Paragraph,
+    /// Fenced or indented code block.
     CodeBlock {
+        /// Optional language/info string.
         language: Option<String>,
+        /// Raw code block contents.
         code: String,
     },
-    ThematicBreak, // Horizontal rule (---, ***, ___)
+    /// Horizontal rule (`---`, `***`, `___`).
+    ThematicBreak,
+    /// Ordered or unordered list container.
     List {
+        /// Whether this is an ordered list.
         ordered: bool,
-        start: Option<u32>, // Starting number for ordered lists
-        tight: bool,        // No blank lines between items
+        /// Starting number for ordered lists.
+        start: Option<u32>,
+        /// Whether list items are tight (no blank separators).
+        tight: bool,
     },
+    /// List item container.
     ListItem,
 
     /// Extended definition lists (Markdown Guide / Markdown Extra-style).
@@ -147,7 +185,9 @@ pub enum NodeKind {
     /// - `DefinitionTerm` should contain inline children.
     /// - `DefinitionDescription` should contain block children.
     DefinitionList,
+    /// Definition term (`dt`) item.
     DefinitionTerm,
+    /// Definition description (`dd`) item.
     DefinitionDescription,
     /// GFM task list checkbox marker for a list item.
     ///
@@ -158,14 +198,17 @@ pub enum NodeKind {
     /// - This node is expected to appear as the first child inside a `ListItem`.
     /// - The HTML renderer will convert it into a themed checkbox icon.
     TaskCheckbox {
+        /// Whether checkbox is checked.
         checked: bool,
     },
+    /// Blockquote container.
     Blockquote,
     /// GitHub-style admonition / alert (GFM extension).
     ///
     /// This is created by a post-parse transformation that recognizes a special
     /// first line inside a blockquote (e.g. `[!NOTE]`) and removes that marker.
     Admonition {
+        /// Admonition semantic kind.
         kind: AdmonitionKind,
         /// Optional custom title for the admonition header.
         ///
@@ -179,7 +222,7 @@ pub enum NodeKind {
         style: AdmonitionStyle,
     },
 
-    /// Marco extended tab blocks.
+    /// Extended tab blocks.
     ///
     /// Syntax (container + items):
     /// ```text
@@ -193,11 +236,13 @@ pub enum NodeKind {
     /// - A `TabGroup` contains one or more `TabItem` children.
     /// - Each `TabItem` contains block children representing the tab panel content.
     TabGroup,
+    /// A single tab item inside a tab group.
     TabItem {
+        /// User-visible tab title.
         title: String,
     },
 
-    /// Marco sliders (planned Reveal.js-like syntax, rendered as a simple slideshow).
+    /// Extended slide decks (Reveal.js-like syntax, rendered as a simple slideshow).
     ///
     /// Syntax:
     /// ```text
@@ -214,12 +259,14 @@ pub enum NodeKind {
     /// - A `SliderDeck` contains one or more `Slide` children.
     /// - Each `Slide` contains block children representing the slide content.
     SliderDeck {
+        /// Optional per-slide timer value in seconds.
         timer_seconds: Option<u32>,
     },
+    /// A single slide inside a slider deck.
     Slide {
         /// True if this slide started after a vertical separator (`--`).
         ///
-        /// The current Marco viewer treats slides as a single linear sequence
+        /// The current viewer treats slides as a single linear sequence
         /// (left/right). This flag is preserved for future vertical navigation.
         vertical: bool,
     },
@@ -229,18 +276,26 @@ pub enum NodeKind {
     /// - Each child is a `TableRow`.
     /// - Each `TableRow` contains `TableCell` children.
     Table {
+        /// Per-column alignments.
         alignments: Vec<TableAlignment>,
     },
+    /// A single table row.
     TableRow {
+        /// Whether this row is part of the table header.
         header: bool,
     },
+    /// A single table cell.
     TableCell {
+        /// Whether this cell is in a header row.
         header: bool,
+        /// Effective alignment for this cell.
         alignment: TableAlignment,
     },
+    /// Raw block-level HTML fragment.
     HtmlBlock {
+        /// Raw HTML source.
         html: String,
-    }, // Block-level HTML (comments, tags, etc.)
+    },
 
     /// GFM-style footnote definition (extension).
     ///
@@ -253,10 +308,11 @@ pub enum NodeKind {
     /// - Instead, the renderer collects referenced footnotes and emits a
     ///   footnotes section at the end of the document.
     FootnoteDefinition {
+        /// Footnote label (without `[^`/`]`).
         label: String,
     },
 
-    // Inline-level
+    /// Plain text inline content.
     Text(String),
     /// Inline task checkbox marker (extension).
     ///
@@ -267,9 +323,12 @@ pub enum NodeKind {
     /// - The HTML renderer converts it into the same themed SVG checkbox icon
     ///   used for task list items.
     TaskCheckboxInline {
+        /// Whether checkbox is checked.
         checked: bool,
     },
+    /// Emphasis inline container.
     Emphasis,
+    /// Strong emphasis inline container.
     Strong,
     /// Combined strong+emphasis, e.g. `***text***` or `___text___`.
     ///
@@ -284,8 +343,11 @@ pub enum NodeKind {
     Superscript,
     /// Subscript (extension), e.g. `~text~`.
     Subscript,
+    /// Inline link node.
     Link {
+        /// Link destination URL.
         url: String,
+        /// Optional link title.
         title: Option<String>,
     },
     /// Reference-style link placeholder (CommonMark): `[text][label]`, `[label][]`, `[label]`.
@@ -313,18 +375,26 @@ pub enum NodeKind {
     ///   superscript link.
     /// - Otherwise it should fall back to literal text.
     FootnoteReference {
+        /// Referenced footnote label.
         label: String,
     },
+    /// Inline image node.
     Image {
+        /// Image source URL.
         url: String,
+        /// Image alt text.
         alt: String,
     },
+    /// Inline code span.
     CodeSpan(String),
+    /// Inline HTML fragment.
     InlineHtml(String),
-    HardBreak, // Two spaces + newline, or backslash + newline
-    SoftBreak, // Regular newline (rendered as space in HTML)
+    /// Hard line break (two spaces + newline or backslash + newline).
+    HardBreak,
+    /// Soft line break.
+    SoftBreak,
 
-    /// Marco extended user mentions.
+    /// Extended user mentions.
     ///
     /// Syntax:
     /// - `@username[platform]`
@@ -334,8 +404,11 @@ pub enum NodeKind {
     /// - The renderer may convert this to an external profile link based on
     ///   a platform mapping table.
     PlatformMention {
+        /// Platform username/handle.
         username: String,
+        /// Platform key, for example `github`.
         platform: String,
+        /// Optional display label override.
         display: Option<String>,
     },
     /// Inline math (LaTeX), e.g. `$E = mc^2$`.
@@ -344,6 +417,7 @@ pub enum NodeKind {
     /// - Rendered using KaTeX in inline mode.
     /// - Content is raw LaTeX source code.
     InlineMath {
+        /// Raw inline LaTeX content.
         content: String,
     },
 
@@ -353,6 +427,7 @@ pub enum NodeKind {
     /// - Rendered using KaTeX in display mode.
     /// - Content is raw LaTeX source code.
     DisplayMath {
+        /// Raw display LaTeX content.
         content: String,
     },
 
@@ -365,19 +440,23 @@ pub enum NodeKind {
     /// This is created during parsing when a fenced code block has
     /// info string "mermaid".
     MermaidDiagram {
+        /// Raw Mermaid diagram source.
         content: String,
     },
 }
 
 impl Document {
+    /// Create an empty document.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Number of top-level nodes in the document.
     pub fn len(&self) -> usize {
         self.children.len()
     }
 
+    /// Returns `true` when the document has no top-level nodes.
     pub fn is_empty(&self) -> bool {
         self.children.is_empty()
     }

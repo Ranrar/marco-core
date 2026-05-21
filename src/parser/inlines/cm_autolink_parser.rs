@@ -3,7 +3,7 @@
 //! Parses autolinks (`<url>` or `<email>`) and converts them to Link nodes.
 //! Email autolinks get "mailto:" prefix, URL autolinks are used as-is.
 
-use super::shared::{to_parser_span, to_parser_span_range, GrammarSpan};
+use super::shared::{opt_span, opt_span_range, GrammarSpan};
 use crate::grammar::inlines as grammar;
 use crate::parser::ast::{Node, NodeKind};
 use nom::IResult;
@@ -24,10 +24,10 @@ pub fn parse_autolink(input: GrammarSpan) -> IResult<GrammarSpan, Node> {
     let (rest, (uri, is_email)) = grammar::autolink(input)?;
 
     // Create span for the full autolink (including < >)
-    let span = to_parser_span_range(start, rest);
+    let span = opt_span_range(start, rest);
 
     // Span for the URI text (for the child text node)
-    let uri_span = to_parser_span(uri);
+    let uri_span = opt_span(uri);
 
     let node = if is_email {
         Node {
@@ -35,10 +35,10 @@ pub fn parse_autolink(input: GrammarSpan) -> IResult<GrammarSpan, Node> {
                 url: format!("mailto:{}", uri.fragment()),
                 title: None,
             },
-            span: Some(span),
+            span,
             children: vec![Node {
                 kind: NodeKind::Text(uri.fragment().to_string()),
-                span: Some(uri_span),
+                span: uri_span,
                 children: Vec::new(),
             }],
         }
@@ -48,10 +48,10 @@ pub fn parse_autolink(input: GrammarSpan) -> IResult<GrammarSpan, Node> {
                 url: uri.fragment().to_string(),
                 title: None,
             },
-            span: Some(span),
+            span,
             children: vec![Node {
                 kind: NodeKind::Text(uri.fragment().to_string()),
-                span: Some(uri_span),
+                span: uri_span,
                 children: Vec::new(),
             }],
         }

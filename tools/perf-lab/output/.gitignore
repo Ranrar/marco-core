@@ -1,0 +1,8 @@
+# Ignore all generated benchmark artifacts
+# (timestamped JSON, CSV, Markdown run outputs)
+*.json
+*.csv
+*.md
+
+# Keep sentinel files
+!.gitkeep

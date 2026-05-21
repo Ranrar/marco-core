@@ -1,7 +1,10 @@
 use super::code_languages::language_display_label;
+#[cfg(feature = "render-diagrams")]
 use super::diagram::render_mermaid_diagram;
+#[cfg(feature = "render-math")]
 use super::math::{render_display_math, render_inline_math};
 use super::plarform_mentions;
+#[cfg(feature = "render-syntax-highlighting")]
 use super::syntect_highlighter::highlight_code_to_classed_html;
 use super::RenderOptions;
 use crate::parser::{AdmonitionKind, AdmonitionStyle, Document, Node, NodeKind};
@@ -10,7 +13,7 @@ use std::collections::HashMap;
 // Code block copy button icon (Tabler icon-tabler-copy).
 const CODE_BLOCK_COPY_SVG: &str = r#"<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1' stroke-linecap='round' stroke-linejoin='round' class='icon icon-tabler icons-tabler-outline icon-tabler-copy'><path stroke='none' d='M0 0h24v24H0z' fill='none'/><path d='M7 9.667a2.667 2.667 0 0 1 2.667 -2.667h8.666a2.667 2.667 0 0 1 2.667 2.667v8.666a2.667 2.667 0 0 1 -2.667 2.667h-8.666a2.667 2.667 0 0 1 -2.667 -2.667l0 -8.666' /><path d='M4.012 16.737a2.005 2.005 0 0 1 -1.012 -1.737v-10c0 -1.1 .9 -2 2 -2h10c.75 0 1.158 .385 1.5 1' /></svg>"#;
 
-// Marco sliders UI icons (Tabler).
+// Slide-deck UI icons (Tabler).
 // These are embedded as inline SVG so they inherit `currentColor`.
 const SLIDER_ARROW_LEFT_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-arrow-narrow-left" aria-hidden="true"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M5 12l14 0" /><path d="M5 12l4 4" /><path d="M5 12l4 -4" /></svg>"#;
 
@@ -32,20 +35,24 @@ struct RenderContext<'a> {
     footnote_ref_counts: HashMap<String, usize>,
     tab_group_counter: usize,
     slider_deck_counter: usize,
+    #[cfg(feature = "render-diagrams")]
     mermaid_result_cache: HashMap<(String, String), Result<String, String>>,
     /// Tracks how many times each slug base has been used so duplicates get
     /// a `-1`, `-2`, … suffix — matching the same logic in `intelligence::toc`.
     heading_slug_counts: HashMap<String, usize>,
 }
 
-// Render document to HTML
+/// Render a parsed Markdown document into HTML.
 pub fn render_html(
     document: &Document,
     options: &RenderOptions,
 ) -> Result<String, Box<dyn std::error::Error>> {
     log::debug!("Rendering {} nodes to HTML", document.len());
 
-    let mut html = String::new();
+    // Estimate output size: typical HTML is ~1.5–2× the AST node count × avg node bytes.
+    // Seeding with a modest non-zero capacity avoids the first few reallocations for free.
+    let estimated = document.children.len() * 64;
+    let mut html = String::with_capacity(estimated.max(256));
 
     let mut ctx = RenderContext::default();
     for node in &document.children {
@@ -73,7 +80,9 @@ pub fn render_html(
                 continue;
             };
 
-            html.push_str(&format!("<li id=\"fn{}\">", n));
+            html.push_str("<li id=\"fn");
+            html.push_str(&n.to_string());
+            html.push_str("\">");
             for child in &def_node.children {
                 render_node(child, &mut html, options, &mut ctx)?;
             }
@@ -127,21 +136,25 @@ fn render_node(
                 slug
             };
 
+            // level is 1–6; render digit as char to avoid a heap allocation.
+            let level_char = char::from_digit(*level as u32, 10).unwrap_or('1');
+            let escaped_id = escape_html(&effective_id);
+
             output.push_str("<h");
-            output.push_str(&level.to_string());
+            output.push(level_char);
             output.push_str(" id=\"");
-            output.push_str(&escape_html(&effective_id));
+            output.push_str(&escaped_id);
             output.push_str("\">");
 
             // Wrap heading text in a self-anchor so the whole heading is clickable.
             output.push_str("<a class=\"marco-heading-anchor\" href=\"#");
-            output.push_str(&escape_html(&effective_id));
+            output.push_str(&escaped_id);
             output.push_str("\" aria-label=\"Link to this heading\">");
             output.push_str(&escaped_text);
             output.push_str("</a>");
 
             output.push_str("</h");
-            output.push_str(&level.to_string());
+            output.push(level_char);
             output.push_str(">\n");
         }
         NodeKind::Paragraph => {
@@ -156,10 +169,10 @@ fn render_node(
             let language_raw = language.as_deref().map(str::trim).filter(|s| !s.is_empty());
 
             // Wrap code block in a container for copy button positioning
-            output.push_str("<div class=\"marco-code-block-wrapper\">");
+            output.push_str("<div class=\"marco-code-block\">");
 
             // Add copy button
-            output.push_str("<button class=\"marco-code-copy-btn\" data-action=\"copy\" aria-label=\"Copy code\" title=\"Copy code\">");
+            output.push_str("<button class=\"marco-copy-btn\" data-action=\"copy\" aria-label=\"Copy code\" title=\"Copy code\">");
             output.push_str(CODE_BLOCK_COPY_SVG);
             output.push_str("</button>");
 
@@ -175,13 +188,16 @@ fn render_node(
 
             // Add language class attribute if language specified
             if let Some(lang) = language_raw {
-                output.push_str(&format!(" class=\"language-{}\"", escape_html(lang)));
+                output.push_str(" class=\"language-");
+                output.push_str(&escape_html(lang));
+                output.push('"');
             }
 
             output.push('>');
 
             // Optional syntax highlighting. If syntect can't resolve the language,
             // fall back to plain escaped code.
+            #[cfg(feature = "render-syntax-highlighting")]
             if options.syntax_highlighting {
                 if let Some(lang) = language_raw {
                     if let Some(highlighted) = highlight_code_to_classed_html(code, lang) {
@@ -393,7 +409,7 @@ fn render_node(
             let platform_key = platform.trim().to_ascii_lowercase();
 
             if let Some(url) = plarform_mentions::profile_url(&platform_key, username) {
-                output.push_str("<a class=\"marco-mention mention-");
+                output.push_str("<a class=\"marco-mention marco-mention-");
                 output.push_str(&escape_html(&platform_key));
                 output.push_str("\" href=\"");
                 output.push_str(&escape_html(&url));
@@ -401,7 +417,7 @@ fn render_node(
                 output.push_str(&escape_html(label));
                 output.push_str("</a>");
             } else {
-                output.push_str("<span class=\"marco-mention mention-unknown\">");
+                output.push_str("<span class=\"marco-mention marco-mention-unknown\">");
                 output.push_str(&escape_html(label));
                 output.push_str("</span>");
             }
@@ -541,6 +557,7 @@ fn render_node(
         }
         NodeKind::InlineMath { content } => {
             // Render inline math using katex-rs
+            #[cfg(feature = "render-math")]
             match render_inline_math(content) {
                 Ok(html) => output.push_str(&html),
                 Err(e) => {
@@ -551,9 +568,16 @@ fn render_node(
                     output.push_str("</code>");
                 }
             }
+            #[cfg(not(feature = "render-math"))]
+            {
+                output.push_str("<code class=\"math\">");
+                output.push_str(&escape_html(content));
+                output.push_str("</code>");
+            }
         }
         NodeKind::DisplayMath { content } => {
             // Render display math using katex-rs
+            #[cfg(feature = "render-math")]
             match render_display_math(content) {
                 Ok(html) => output.push_str(&html),
                 Err(e) => {
@@ -564,44 +588,59 @@ fn render_node(
                     output.push_str("</pre>");
                 }
             }
+            #[cfg(not(feature = "render-math"))]
+            {
+                output.push_str("<pre class=\"math\"><code>");
+                output.push_str(&escape_html(content));
+                output.push_str("</code></pre>\n");
+            }
         }
         NodeKind::MermaidDiagram { content } => {
             // Render Mermaid diagram using mermaid-rs-renderer with per-render-pass caching.
-            let cache_key = (options.theme.clone(), content.clone());
-            let rendered = if let Some(cached) = ctx.mermaid_result_cache.get(&cache_key) {
-                cached.clone()
-            } else {
-                let fresh = match render_mermaid_diagram(content, &options.theme) {
-                    Ok(svg) => Ok(svg),
-                    Err(e) => Err(e.to_string()),
+            #[cfg(feature = "render-diagrams")]
+            {
+                let cache_key = (options.theme.clone(), content.clone());
+                let rendered = if let Some(cached) = ctx.mermaid_result_cache.get(&cache_key) {
+                    cached.clone()
+                } else {
+                    let fresh = match render_mermaid_diagram(content, &options.theme) {
+                        Ok(svg) => Ok(svg),
+                        Err(e) => Err(e.to_string()),
+                    };
+                    ctx.mermaid_result_cache.insert(cache_key, fresh.clone());
+                    fresh
                 };
-                ctx.mermaid_result_cache.insert(cache_key, fresh.clone());
-                fresh
-            };
 
-            match rendered {
-                Ok(svg) => {
-                    output.push_str("<div class=\"marco-mermaid\">");
-                    output.push_str(&svg);
-                    output.push_str("</div>\n");
-                }
-                Err(e) => {
-                    log::warn!("Mermaid render error: {}", e);
-                    // Fallback: show raw Mermaid in a code block
-                    let mut title = String::from("Failed to render diagram: ");
-                    let max_len = 160usize;
-                    if e.chars().count() > max_len {
-                        title.push_str(&e.chars().take(max_len).collect::<String>());
-                        title.push('…');
-                    } else {
-                        title.push_str(&e);
+                match rendered {
+                    Ok(svg) => {
+                        output.push_str("<div class=\"marco-diagram\">");
+                        output.push_str(&svg);
+                        output.push_str("</div>\n");
                     }
-                    output.push_str("<pre class=\"mermaid-error\" title=\"");
-                    output.push_str(&escape_html(&title));
-                    output.push_str("\"><code>");
-                    output.push_str(&escape_html(content));
-                    output.push_str("</code></pre>\n");
+                    Err(e) => {
+                        log::warn!("Mermaid render error: {}", e);
+                        // Fallback: show raw Mermaid in a code block
+                        let mut title = String::from("Failed to render diagram: ");
+                        let max_len = 160usize;
+                        if e.chars().count() > max_len {
+                            title.push_str(&e.chars().take(max_len).collect::<String>());
+                            title.push('…');
+                        } else {
+                            title.push_str(&e);
+                        }
+                        output.push_str("<pre class=\"mermaid-error\" title=\"");
+                        output.push_str(&escape_html(&title));
+                        output.push_str("\"><code>");
+                        output.push_str(&escape_html(content));
+                        output.push_str("</code></pre>\n");
+                    }
                 }
+            }
+            #[cfg(not(feature = "render-diagrams"))]
+            {
+                output.push_str("<pre class=\"mermaid\"><code>");
+                output.push_str(&escape_html(content));
+                output.push_str("</code></pre>\n");
             }
         }
     }
@@ -873,20 +912,20 @@ fn render_task_checkbox_icon(output: &mut String, checked: bool) {
     // - checkmark: theme accent
     if checked {
         output.push_str(
-            r#"<span class="task-list-item-checkbox marco-task-checkbox checked" aria-hidden="true">"#,
+            r#"<span class="marco-marco-marco-task-checkbox checked" aria-hidden="true">"#,
         );
         output.push_str(
             concat!(
                 r#"<svg xmlns=""#,
                 "http",
                 r#"://www.w3.org/2000/svg"#,
-                r#"" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" class="marco-task-icon"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path class="marco-task-check" style="stroke: var(--marco-task-accent); stroke-width: 2.0;" d="M9 11l3 3l8 -8" /><path class="marco-task-box" style="stroke: var(--marco-task-primary);" d="M3 5a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-14" /></svg>"#,
+                r#"" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" class="marco-task-icon"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path class="marco-task-check" style="stroke: var(--mc-task-accent); stroke-width: 2.0;" d="M9 11l3 3l8 -8" /><path class="marco-task-box" style="stroke: var(--mc-task-primary);" d="M3 5a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-14" /></svg>"#,
             ),
         );
         output.push_str("</span>");
     } else {
         output.push_str(
-            r#"<span class="task-list-item-checkbox marco-task-checkbox unchecked" aria-hidden="true">"#,
+            r#"<span class="marco-marco-marco-task-checkbox unchecked" aria-hidden="true">"#,
         );
         output.push_str(
             concat!(
@@ -1015,9 +1054,9 @@ fn render_list_item(
 
     if let Some(checked) = task_checked {
         if checked {
-            output.push_str("<li class=\"task-list-item task-list-item-checked\">");
+            output.push_str("<li class=\"marco-task-list-item marco-task-list-item--checked\">");
         } else {
-            output.push_str("<li class=\"task-list-item\">");
+            output.push_str("<li class=\"marco-task-list-item\">");
         }
     } else {
         output.push_str("<li>");
@@ -1203,8 +1242,8 @@ mod tests {
         let options = RenderOptions::default();
         let result = render_html(&doc, &options).unwrap();
         // Should contain wrapper div and copy button
-        assert!(result.contains("<div class=\"marco-code-block-wrapper\">"));
-        assert!(result.contains("<button class=\"marco-code-copy-btn\""));
+        assert!(result.contains("<div class=\"marco-code-block\">"));
+        assert!(result.contains("<button class=\"marco-copy-btn\""));
         assert!(result.contains("icon-tabler-copy"));
         assert!(result
             .contains("<pre><code>fn main() {\n    println!(&quot;Hello&quot;);\n}</code></pre>"));
@@ -1230,8 +1269,8 @@ mod tests {
         };
         let result = render_html(&doc, &options).unwrap();
         // Should contain wrapper div, copy button, and language attribute
-        assert!(result.contains("<div class=\"marco-code-block-wrapper\">"));
-        assert!(result.contains("<button class=\"marco-code-copy-btn\""));
+        assert!(result.contains("<div class=\"marco-code-block\">"));
+        assert!(result.contains("<button class=\"marco-copy-btn\""));
         assert!(result.contains(
             "<pre data-language=\"Rust\"><code class=\"language-rust\">let x = 42;</code></pre>"
         ));
@@ -1257,8 +1296,8 @@ mod tests {
         };
         let result = render_html(&doc, &options).unwrap();
         // Should contain wrapper, copy button, and properly escaped HTML
-        assert!(result.contains("<div class=\"marco-code-block-wrapper\">"));
-        assert!(result.contains("<button class=\"marco-code-copy-btn\""));
+        assert!(result.contains("<div class=\"marco-code-block\">"));
+        assert!(result.contains("<button class=\"marco-copy-btn\""));
         assert!(result.contains("<pre data-language=\"HTML\"><code class=\"language-html\">&lt;div&gt;Test &amp; verify&lt;/div&gt;</code></pre>"));
         assert!(result.contains("</div>\n"));
     }
@@ -1335,8 +1374,8 @@ mod tests {
         // Should contain heading (now with auto-slug id), paragraph, and code block with wrapper
         assert!(result.contains("<h1 id=\"title\">"));
         assert!(result.contains("<p>Some text.</p>\n"));
-        assert!(result.contains("<div class=\"marco-code-block-wrapper\">"));
-        assert!(result.contains("<button class=\"marco-code-copy-btn\""));
+        assert!(result.contains("<div class=\"marco-code-block\">"));
+        assert!(result.contains("<button class=\"marco-copy-btn\""));
         assert!(result.contains("<pre data-language=\"Python\"><code class=\"language-python\">print(&#39;hello&#39;)</code></pre>"));
         assert!(result.contains("</div>\n"));
     }

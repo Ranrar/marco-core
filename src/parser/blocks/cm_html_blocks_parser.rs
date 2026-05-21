@@ -9,7 +9,7 @@
 //! - Type 6: Standard block tags (div, table, etc.)
 //! - Type 7: Complete tags (cannot interrupt paragraphs)
 
-use super::shared::{to_parser_span, GrammarSpan};
+use super::shared::{opt_span, GrammarSpan};
 use crate::parser::ast::{Node, NodeKind};
 
 /// Parse an HTML block into an AST node.
@@ -31,13 +31,13 @@ use crate::parser::ast::{Node, NodeKind};
 /// assert!(matches!(node.kind, NodeKind::HtmlBlock { .. }));
 /// ```
 pub fn parse_html_block(content: GrammarSpan) -> Node {
-    let span = to_parser_span(content);
+    let span = opt_span(content);
 
     Node {
         kind: NodeKind::HtmlBlock {
             html: content.fragment().to_string(),
         },
-        span: Some(span),
+        span,
         children: Vec::new(),
     }
 }

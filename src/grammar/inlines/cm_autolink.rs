@@ -46,6 +46,7 @@ fn is_valid_email(s: &str) -> bool {
     false
 }
 
+/// Parse a CommonMark autolink (`<scheme:...>` or `<user@example.com>`).
 pub fn autolink(input: Span) -> IResult<Span, (Span, bool)> {
     log::debug!("Parsing autolink at: {:?}", input.fragment());
     let (input, _) = tag("<")(input)?;

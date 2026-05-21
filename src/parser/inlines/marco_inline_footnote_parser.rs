@@ -1,4 +1,4 @@
-//! Inline footnotes (Marco extension).
+//! Inline footnotes (extended syntax).
 //!
 //! Syntax: `^[footnote content]`
 //!
@@ -9,9 +9,9 @@
 //! Notes / constraints:
 //! - Inline footnotes are single-use: each `^[...]` creates a new footnote.
 //! - The content is parsed as inline Markdown (no multi-paragraph support).
-//! - This parser is intentionally conservative and does not span newlines.
+//! - Content may span multiple lines within a single paragraph.
 
-use super::shared::{to_parser_span, GrammarSpan};
+use super::shared::{opt_span, GrammarSpan};
 use crate::parser::ast::{Node, NodeKind};
 use nom::IResult;
 use nom::Input;
@@ -39,14 +39,6 @@ pub fn parse_inline_footnote(input: GrammarSpan) -> IResult<GrammarSpan, (Node, 
 
     while pos < bytes.len() {
         let b = bytes[pos];
-
-        if b == b'\n' {
-            // Inline footnotes must not span lines.
-            return Err(nom::Err::Error(nom::error::Error::new(
-                input,
-                nom::error::ErrorKind::Tag,
-            )));
-        }
 
         if b == b'`' {
             in_code = !in_code;
@@ -88,7 +80,7 @@ pub fn parse_inline_footnote(input: GrammarSpan) -> IResult<GrammarSpan, (Node, 
                 kind: NodeKind::FootnoteReference {
                     label: label.clone(),
                 },
-                span: Some(to_parser_span(taken)),
+                span: opt_span(taken),
                 children: Vec::new(),
             };
 
@@ -155,9 +147,21 @@ mod tests {
     }
 
     #[test]
-    fn smoke_test_parse_inline_footnote_rejects_newline() {
-        let input = GrammarSpan::new("^[hi\nthere]");
-        assert!(parse_inline_footnote(input).is_err());
+    fn smoke_test_parse_inline_footnote_spans_newline() {
+        // Multi-line content within a paragraph is allowed.
+        let input = GrammarSpan::new("^[first line\nsecond line] rest");
+        let (rest, (ref_node, def_node)) = parse_inline_footnote(input).expect("should parse");
+        assert_eq!(*rest.fragment(), " rest");
+
+        match ref_node.kind {
+            NodeKind::FootnoteReference { label } => {
+                assert!(label.starts_with("marco-inline-"));
+            }
+            other => panic!("expected FootnoteReference, got {other:?}"),
+        }
+
+        assert_eq!(def_node.children.len(), 1);
+        assert!(matches!(def_node.children[0].kind, NodeKind::Paragraph));
     }
 
     #[test]

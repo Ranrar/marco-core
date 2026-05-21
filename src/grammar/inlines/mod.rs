@@ -8,6 +8,7 @@
 
 // Re-export the Span type for use by all inline modules
 pub use nom_locate::LocatedSpan;
+/// Inline grammar span type preserving location information.
 pub type Span<'a> = LocatedSpan<&'a str>;
 
 // Individual inline grammar modules

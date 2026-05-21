@@ -3,6 +3,100 @@
 
 use crate::parser::position::{Position, Span as ParserSpan};
 use nom_locate::LocatedSpan;
+use std::cell::Cell;
+
+// ---------------------------------------------------------------------------
+// Per-parse runtime option flags (thread-local for zero call-site overhead)
+// ---------------------------------------------------------------------------
+
+thread_local! {
+    static TRACK_POSITIONS: Cell<bool> = const { Cell::new(true) };
+    static PARSE_MATH: Cell<bool>      = const { Cell::new(true) };
+    static PARSE_DIAGRAMS: Cell<bool>  = const { Cell::new(true) };
+}
+
+/// RAII guard that sets per-thread parse options and restores them on drop.
+///
+/// Created by [`parse_with_options`] before calling the parse pipeline; dropped
+/// (and thus restored) when the parse call returns or panics.
+pub(crate) struct ParseOptionsGuard {
+    prev_track: bool,
+    prev_math: bool,
+    prev_diagrams: bool,
+}
+
+impl ParseOptionsGuard {
+    pub(crate) fn new(track: bool, math: bool, diagrams: bool) -> Self {
+        let prev_track = TRACK_POSITIONS.with(|c| c.replace(track));
+        let prev_math = PARSE_MATH.with(|c| c.replace(math));
+        let prev_diagrams = PARSE_DIAGRAMS.with(|c| c.replace(diagrams));
+        Self {
+            prev_track,
+            prev_math,
+            prev_diagrams,
+        }
+    }
+}
+
+impl Drop for ParseOptionsGuard {
+    fn drop(&mut self) {
+        TRACK_POSITIONS.with(|c| c.set(self.prev_track));
+        PARSE_MATH.with(|c| c.set(self.prev_math));
+        PARSE_DIAGRAMS.with(|c| c.set(self.prev_diagrams));
+    }
+}
+
+/// Returns whether math parsing is enabled in the current parse context.
+#[inline]
+pub(crate) fn parse_math_enabled() -> bool {
+    PARSE_MATH.with(|c| c.get())
+}
+
+/// Returns whether diagram parsing is enabled in the current parse context.
+#[inline]
+pub(crate) fn parse_diagrams_enabled() -> bool {
+    PARSE_DIAGRAMS.with(|c| c.get())
+}
+
+// ---------------------------------------------------------------------------
+// opt_span helpers — use these in parser code instead of `Some(to_parser_span(...))`
+// ---------------------------------------------------------------------------
+
+/// Returns `None` (skipping O(n) string scans) when position tracking is disabled,
+/// or `Some(span)` with real line/column data when enabled.
+///
+/// Replace `span: Some(to_parser_span(x))` with `span: opt_span(x)`.
+#[inline]
+pub fn opt_span(span: GrammarSpan) -> Option<ParserSpan> {
+    if !TRACK_POSITIONS.with(|c| c.get()) {
+        return None;
+    }
+    Some(to_parser_span(span))
+}
+
+/// Like [`opt_span`] but takes a start/end range using exclusive end semantics.
+///
+/// Replace `span: Some(to_parser_span_range(start, end))` with
+/// `span: opt_span_range(start, end)`.
+#[inline]
+pub fn opt_span_range(start: GrammarSpan, end: GrammarSpan) -> Option<ParserSpan> {
+    if !TRACK_POSITIONS.with(|c| c.get()) {
+        return None;
+    }
+    Some(to_parser_span_range(start, end))
+}
+
+/// Like [`opt_span`] but takes a start/end range using inclusive end semantics.
+///
+/// Replace `span: Some(to_parser_span_range_inclusive(start, end))` with
+/// `span: opt_span_range_inclusive(start, end)`.
+#[inline]
+pub fn opt_span_range_inclusive(start: GrammarSpan, end: GrammarSpan) -> Option<ParserSpan> {
+    if !TRACK_POSITIONS.with(|c| c.get()) {
+        return None;
+    }
+    Some(to_parser_span_range_inclusive(start, end))
+}
 
 /// Grammar span type (nom_locate::LocatedSpan)
 pub type GrammarSpan<'a> = LocatedSpan<&'a str>;
@@ -14,18 +108,32 @@ pub type GrammarSpan<'a> = LocatedSpan<&'a str>;
 /// 1-based offsets to match `Position` semantics.
 pub fn to_parser_span(span: GrammarSpan) -> ParserSpan {
     let start_line = span.location_line() as usize; // 1-based
-    let newline_count = span.fragment().matches('\n').count();
+    let frag = span.fragment().as_bytes();
+
+    // Single O(n) pass: count newlines and record the last newline byte position.
+    let mut newline_count = 0usize;
+    let mut last_nl: Option<usize> = None;
+    for (i, &b) in frag.iter().enumerate() {
+        if b == b'\n' {
+            newline_count += 1;
+            last_nl = Some(i);
+        }
+    }
     let end_line = start_line + newline_count;
 
-    let end_column = if span.fragment().ends_with('\n') {
-        // If the fragment ends with newline, end column is column 1 of next line
-        1
-    } else if let Some(last_newline_pos) = span.fragment().rfind('\n') {
-        // Multi-line: bytes after last newline + 1 for 1-based
-        span.fragment()[last_newline_pos + 1..].len() + 1
-    } else {
-        // Single-line: start column (byte-based) + fragment byte length
-        span.get_column() + span.fragment().len()
+    let end_column = match last_nl {
+        Some(pos) if pos == frag.len() - 1 => {
+            // Fragment ends with '\n' — end column is column 1 of the next line.
+            1
+        }
+        Some(pos) => {
+            // Multi-line: bytes after last newline + 1 (1-based).
+            frag.len() - pos - 1 + 1
+        }
+        None => {
+            // Single-line: start column (byte-based) + fragment byte length.
+            span.get_column() + frag.len()
+        }
     };
 
     let start = Position::new(start_line, span.get_column(), span.location_offset());

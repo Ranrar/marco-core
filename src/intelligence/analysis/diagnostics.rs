@@ -1,4 +1,4 @@
-// Diagnostics: parse errors, broken links, etc.
+//! Diagnostics for parse, structure, links, and extension validation.
 
 use crate::parser::{Document, Node, NodeKind, Position, Span};
 use std::borrow::Cow;
@@ -6,14 +6,20 @@ use std::collections::{HashMap, HashSet};
 use std::sync::OnceLock;
 
 #[derive(Debug, Clone, PartialEq)]
+/// Diagnostic entry emitted by markdown analysis.
 pub struct Diagnostic {
+    /// Stable diagnostic code identifier.
     pub code: DiagnosticCode,
+    /// Source span where the issue applies.
     pub span: Span,
+    /// Severity level.
     pub severity: DiagnosticSeverity,
+    /// User-facing diagnostic message.
     pub message: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Policy profile controlling which diagnostics are emitted.
 pub enum DiagnosticsProfile {
     /// Emit all diagnostics (full analysis mode).
     All,
@@ -22,13 +28,16 @@ pub enum DiagnosticsProfile {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Runtime options used while computing diagnostics.
 pub struct DiagnosticsOptions {
+    /// Profile deciding which severities are emitted.
     pub profile: DiagnosticsProfile,
     /// Optional cap to avoid flooding downstream consumers.
     pub max_diagnostics: Option<usize>,
 }
 
 impl DiagnosticsOptions {
+    /// Create options that emit all diagnostics.
     pub const fn all() -> Self {
         Self {
             profile: DiagnosticsProfile::All,
@@ -36,6 +45,7 @@ impl DiagnosticsOptions {
         }
     }
 
+    /// Create options that emit only critical diagnostics.
     pub const fn critical_only() -> Self {
         Self {
             profile: DiagnosticsProfile::CriticalOnly,
@@ -58,82 +68,135 @@ impl Default for DiagnosticsOptions {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DiagnosticCode {
     // Parse / ingestion (MD0xx)
+    /// Generic parse failure.
     ParseFailure,
 
     // Headings (MD1xx)
+    /// Heading level is invalid.
     InvalidHeadingLevel,
+    /// Heading text is empty.
     EmptyHeadingText,
+    /// Explicit heading id is duplicated.
     DuplicateHeadingId,
+    /// Heading content exceeds recommended size.
     HeadingTooLong,
 
     // Links (MD2xx)
+    /// Link URL is empty.
     EmptyLinkUrl,
+    /// Link uses a blocked protocol.
     UnsafeLinkProtocol,
+    /// Link uses an insecure protocol.
     InsecureLinkProtocol,
+    /// Reference-style link cannot be resolved.
     UnresolvedLinkReference,
+    /// Link reference label is empty.
     EmptyLinkReferenceLabel,
 
     // Code blocks (MD3xx)
+    /// Code block has no content.
     EmptyCodeBlock,
+    /// Code block is missing language hint.
     MissingCodeBlockLanguage,
 
     // Images (MD-4xx)
+    /// Image URL is empty.
     EmptyImageUrl,
+    /// Image alt text is missing.
     ImageMissingAltText,
+    /// Image uses a blocked protocol.
     UnsafeImageProtocol,
 
     // Inline HTML (MD-5xx)
+    /// Inline HTML contains script content.
     InlineHtmlContainsScript,
+    /// Inline HTML uses a JavaScript URL.
     InlineHtmlJavascriptUrl,
+    /// Inline HTML contains unsafe event handler attributes.
     InlineHtmlUnsafeEventHandler,
 
     // Block HTML (MD6xx)
+    /// HTML block contains script content.
     HtmlBlockContainsScript,
+    /// HTML block uses a JavaScript URL.
     HtmlBlockJavascriptUrl,
+    /// HTML block has no meaningful content.
     EmptyHtmlBlock,
+    /// HTML block has mismatched angle-bracket structure.
     HtmlBlockMismatchedAngles,
+    /// HTML block contains unsafe event handler attributes.
     HtmlBlockUnsafeEventHandler,
 
     // Structural blocks (MD7xx)
+    /// List is empty.
     EmptyList,
+    /// List item is empty.
     EmptyListItem,
+    /// Task checkbox markup is malformed.
     MalformedTaskCheckbox,
+    /// Task list item contains no content after checkbox.
     EmptyTaskListItem,
+    /// Blockquote contains no meaningful content.
     EmptyBlockquote,
+    /// Definition list is empty.
     EmptyDefinitionList,
+    /// Definition term is empty.
     EmptyDefinitionTerm,
+    /// Definition description is empty.
     EmptyDefinitionDescription,
+    /// Table cell is empty.
     EmptyTableCell,
 
     // Footnotes (MD8xx)
+    /// Footnote reference has no matching definition.
     MissingFootnoteDefinition,
+    /// Footnote definition label is duplicated.
     DuplicateFootnoteDefinition,
+    /// Footnote definition is never referenced.
     UnusedFootnoteDefinition,
 
     // Extended blocks & rich content (MD9xx)
+    /// Tab group has no tab items.
     EmptyTabGroup,
+    /// Tab title is empty.
     EmptyTabTitle,
+    /// Tab title is duplicated in same tab group.
     DuplicateTabTitle,
+    /// Tab panel has no content.
     EmptyTabPanel,
+    /// Slider deck has no slides.
     EmptySliderDeck,
+    /// Slide has no content.
     EmptySlide,
+    /// Admonition body has no content.
     EmptyAdmonitionBody,
+    /// Math expression is empty.
     EmptyMathExpression,
+    /// Mermaid diagram source is empty.
     EmptyMermaidDiagram,
+    /// Admonition title is empty.
     EmptyAdmonitionTitle,
+    /// Admonition kind is unknown.
     UnknownAdmonitionKind,
+    /// Slider timer value is invalid.
     InvalidSliderTimer,
+    /// Platform mention username is empty.
     EmptyPlatformMentionUsername,
+    /// Platform mention target platform is unknown.
     UnknownPlatformMentionPlatform,
+    /// Emoji shortcode is unknown.
     UnknownEmojiShortcode,
+    /// Platform mention display name is empty.
     EmptyPlatformMentionDisplayName,
 }
 
 impl DiagnosticCode {
+    /// Internal catalog key (Rust enum variant name).
     pub fn catalog_key(self) -> String {
         format!("{self:?}")
     }
 
+    /// Stable external code value (for example `MD103`).
     pub fn as_str(self) -> &'static str {
         self.catalog_entry()
             .map(|entry| entry.code.as_str())
@@ -274,14 +337,20 @@ impl Diagnostic {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Diagnostic severity level.
 pub enum DiagnosticSeverity {
+    /// Error severity.
     Error,
+    /// Warning severity.
     Warning,
+    /// Informational severity.
     Info,
+    /// Hint severity.
     Hint,
 }
 
 impl DiagnosticSeverity {
+    /// Parse severity from catalog string value.
     pub fn from_catalog_str(value: &str) -> Option<Self> {
         match value {
             "Error" => Some(Self::Error),
@@ -665,7 +734,7 @@ fn text_has_unknown_emoji_shortcode(text: &str) -> bool {
     })
 }
 
-// Compute diagnostics for document
+/// Compute diagnostics for a parsed markdown document.
 pub fn compute_diagnostics(document: &Document) -> Vec<Diagnostic> {
     compute_diagnostics_with_options(document, DiagnosticsOptions::all())
 }

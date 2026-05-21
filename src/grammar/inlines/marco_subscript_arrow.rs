@@ -1,4 +1,4 @@
-//! Subscript grammar (arrow-style Marco extension)
+//! Subscript grammar (arrow-style extended syntax).
 //!
 //! Parses:
 //! - `˅text˅`

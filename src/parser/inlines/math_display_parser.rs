@@ -2,7 +2,7 @@
 //!
 //! Parses display math delimited by `$$...$$` using KaTeX.
 
-use super::shared::{to_parser_span, GrammarSpan};
+use super::shared::{opt_span, GrammarSpan};
 use crate::grammar::inlines::display_math;
 use crate::parser::ast::{Node, NodeKind};
 use nom::IResult;
@@ -22,7 +22,7 @@ pub fn parse_display_math(input: GrammarSpan) -> IResult<GrammarSpan, Node> {
         kind: NodeKind::DisplayMath {
             content: content_span.fragment().to_string(),
         },
-        span: Some(to_parser_span(content_span)),
+        span: opt_span(content_span),
         children: Vec::new(),
     };
 

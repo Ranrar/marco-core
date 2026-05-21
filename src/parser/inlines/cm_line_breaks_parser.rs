@@ -3,7 +3,7 @@
 //! Parses hard line breaks (two spaces + newline or backslash + newline) and
 //! soft line breaks (regular newline) and converts them to Break nodes.
 
-use super::shared::{to_parser_span_range, GrammarSpan};
+use super::shared::{opt_span_range, GrammarSpan};
 use crate::grammar::inlines as grammar;
 use crate::parser::ast::{Node, NodeKind};
 use nom::IResult;
@@ -24,7 +24,7 @@ pub fn parse_hard_line_break(input: GrammarSpan) -> IResult<GrammarSpan, Node> {
 
     let node = Node {
         kind: NodeKind::HardBreak,
-        span: Some(to_parser_span_range(input, rest)),
+        span: opt_span_range(input, rest),
         children: Vec::new(),
     };
 
@@ -47,7 +47,7 @@ pub fn parse_soft_line_break(input: GrammarSpan) -> IResult<GrammarSpan, Node> {
 
     let node = Node {
         kind: NodeKind::SoftBreak,
-        span: Some(to_parser_span_range(input, rest)),
+        span: opt_span_range(input, rest),
         children: Vec::new(),
     };
 

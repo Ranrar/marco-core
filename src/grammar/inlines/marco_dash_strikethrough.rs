@@ -1,4 +1,4 @@
-//! Dash strikethrough grammar (Marco extension)
+//! Dash strikethrough grammar (extended syntax).
 //!
 //! Parses:
 //! - `--text--`

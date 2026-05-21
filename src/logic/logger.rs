@@ -1,14 +1,25 @@
+#[cfg(feature = "file-logger")]
 use chrono::Local;
+#[cfg(feature = "file-logger")]
 use log::{Level, LevelFilter, Log, Metadata, Record};
+#[cfg(feature = "file-logger")]
 use std::boxed::Box;
+#[cfg(feature = "file-logger")]
 use std::fs::{self, File, OpenOptions};
+#[cfg(feature = "file-logger")]
 use std::io::{BufWriter, Write};
+#[cfg(feature = "file-logger")]
 use std::path::PathBuf;
+#[cfg(feature = "file-logger")]
 use std::sync::atomic::{AtomicU64, Ordering};
+#[cfg(feature = "file-logger")]
 use std::sync::{Mutex, OnceLock};
 
+#[cfg(feature = "file-logger")]
 static LOGGER: OnceLock<&'static SimpleFileLogger> = OnceLock::new();
 
+/// File-backed logger implementation used by this crate.
+#[cfg(feature = "file-logger")]
 pub struct SimpleFileLogger {
     inner: Mutex<Option<BufWriter<File>>>,
     file_path: PathBuf,
@@ -18,19 +29,22 @@ pub struct SimpleFileLogger {
 
 // Keep log files reasonably sized so editors (and VS Code) can open them
 // without trying to load hundreds of MB into memory.
+#[cfg(feature = "file-logger")]
 const MAX_LOG_BYTES: u64 = 10 * 1024 * 1024; // 10 MiB
 
+#[cfg(feature = "file-logger")]
 impl SimpleFileLogger {
+    /// Initialize the global file logger.
     pub fn init(enabled: bool, level: LevelFilter) -> Result<(), Box<dyn std::error::Error>> {
         if !enabled {
             log::set_max_level(LevelFilter::Off);
             return Ok(());
         }
 
-        // Use platform-appropriate cache directory for logs
+        // Use platform-appropriate cache directories for logs.
         // **Windows Portable Mode**: {exe_dir}\logs\
-        // **Windows Installed Mode**: %LOCALAPPDATA%\Marco\logs
-        // **Linux**: ~/.cache/marco/logs
+        // **Windows Installed Mode**: %LOCALAPPDATA%\<editor>\logs
+        // **Linux**: ~/.cache/<editor>/logs
 
         let mut log_root: Option<PathBuf> = {
             // Windows: portable mode + Windows-specific fallbacks.
@@ -192,6 +206,7 @@ impl SimpleFileLogger {
     }
 }
 
+#[cfg(feature = "file-logger")]
 impl Log for SimpleFileLogger {
     fn enabled(&self, metadata: &Metadata) -> bool {
         // Always accept logs at the configured level or higher
@@ -250,6 +265,8 @@ impl Log for SimpleFileLogger {
     }
 }
 
+/// Initialize file logging with enable flag and maximum log level.
+#[cfg(feature = "file-logger")]
 pub fn init_file_logger(
     enabled: bool,
     level: LevelFilter,
@@ -258,6 +275,7 @@ pub fn init_file_logger(
 }
 
 /// Returns true if the file logger was successfully initialized by this library.
+#[cfg(feature = "file-logger")]
 pub fn is_file_logger_initialized() -> bool {
     LOGGER.get().is_some()
 }
@@ -265,6 +283,7 @@ pub fn is_file_logger_initialized() -> bool {
 /// Return the resolved root logs directory (no month folder). This is a
 /// non-negotiable platform-specific location using the system cache dir and
 /// the folder name `logs` per project policy.
+#[cfg(feature = "file-logger")]
 pub fn current_log_root_dir() -> std::path::PathBuf {
     // Prefer OS cache dir when available, else fall back to a platform temp path
     if let Some(cache_dir) = dirs::cache_dir() {
@@ -283,6 +302,7 @@ pub fn current_log_root_dir() -> std::path::PathBuf {
 }
 
 /// Return the resolved log directory for the current month (YYYYMM folder).
+#[cfg(feature = "file-logger")]
 pub fn current_log_dir() -> std::path::PathBuf {
     use chrono::Local;
     let mut root = current_log_root_dir();
@@ -293,6 +313,7 @@ pub fn current_log_dir() -> std::path::PathBuf {
 
 /// Convenience: return the current log file path for today (YYMMDD.log) inside
 /// the resolved log directory.
+#[cfg(feature = "file-logger")]
 pub fn current_log_file_for_today() -> std::path::PathBuf {
     use chrono::Local;
     let dir = current_log_dir();
@@ -301,6 +322,7 @@ pub fn current_log_file_for_today() -> std::path::PathBuf {
 }
 
 /// Compute total size in bytes of all log files under the root logs directory.
+#[cfg(feature = "file-logger")]
 pub fn total_log_size_bytes() -> u64 {
     use std::fs;
     let root = current_log_root_dir();
@@ -333,6 +355,7 @@ pub fn total_log_size_bytes() -> u64 {
 
 /// Delete all logs under the root logs directory.
 /// Best-effort: removes files and month folders, returns error on I/O failures.
+#[cfg(feature = "file-logger")]
 pub fn delete_all_logs() -> Result<(), Box<dyn std::error::Error>> {
     use std::fs;
     let root = current_log_root_dir();
@@ -366,6 +389,7 @@ pub fn delete_all_logs() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+#[cfg(feature = "file-logger")]
 impl SimpleFileLogger {
     /// Flush and close the inner file. After shutdown, the global LOGGER will be cleared.
     pub fn shutdown(&self) {
@@ -380,6 +404,7 @@ impl SimpleFileLogger {
 }
 
 /// Public shutdown hook to safely flush and drop the global logger.
+#[cfg(feature = "file-logger")]
 pub fn shutdown_file_logger() {
     if let Some(logger) = LOGGER.get() {
         logger.shutdown();
@@ -465,4 +490,76 @@ fn is_dir_writable(dir: &std::path::Path) -> bool {
             std::fs::remove_file(&test_file)
         })
         .is_ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn smoke_test_safe_preview_ascii() {
+        assert_eq!(safe_preview("Hello, world!", 5), "Hello");
+        assert_eq!(safe_preview("Hi", 100), "Hi");
+        assert_eq!(safe_preview("", 10), "");
+    }
+
+    #[test]
+    fn smoke_test_safe_preview_multibyte_emoji() {
+        // "😀" is a 4-byte character; safe_preview counts chars, not bytes
+        let s = "😀 café";
+        assert_eq!(safe_preview(s, 1), "😀");
+        assert_eq!(safe_preview(s, 3), "😀 c");
+    }
+
+    #[test]
+    fn smoke_test_safe_preview_zero_limit() {
+        assert_eq!(safe_preview("anything", 0), "");
+    }
+
+    #[cfg(feature = "file-logger")]
+    #[test]
+    fn smoke_test_is_file_logger_initialized_returns_bool() {
+        // Before any init call in this test process the result is either
+        // true (another test initialised it) or false — it must not panic.
+        let _ = is_file_logger_initialized();
+    }
+
+    #[cfg(feature = "file-logger")]
+    #[test]
+    fn smoke_test_log_path_helpers_return_non_empty_paths() {
+        // These functions compute deterministic paths and must not panic.
+        let root = current_log_root_dir();
+        assert!(
+            !root.as_os_str().is_empty(),
+            "log root dir must not be empty"
+        );
+
+        let dir = current_log_dir();
+        assert!(!dir.as_os_str().is_empty(), "log dir must not be empty");
+
+        let file = current_log_file_for_today();
+        assert!(
+            !file.as_os_str().is_empty(),
+            "log file path must not be empty"
+        );
+
+        // log dir should be a subdirectory of root
+        assert!(
+            dir.starts_with(&root),
+            "current_log_dir() should be nested inside current_log_root_dir()"
+        );
+
+        // today's file should be inside the log dir
+        assert!(
+            file.starts_with(&dir),
+            "current_log_file_for_today() should be inside current_log_dir()"
+        );
+    }
+
+    #[cfg(feature = "file-logger")]
+    #[test]
+    fn smoke_test_total_log_size_bytes_does_not_panic() {
+        // May return 0 if no log files exist; must not panic regardless.
+        let _size = total_log_size_bytes();
+    }
 }

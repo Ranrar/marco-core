@@ -68,7 +68,7 @@ pub use text_parser::{parse_special_as_text, parse_text};
 
 use super::ast::{Node, NodeKind};
 use nom::bytes::complete::take;
-use shared::{to_parser_span, GrammarSpan};
+use shared::{opt_span, GrammarSpan};
 
 /// Parse inline elements within text content
 /// Takes a GrammarSpan to preserve position information
@@ -80,7 +80,7 @@ pub fn parse_inlines_from_span(span: GrammarSpan) -> Result<Vec<Node>, Box<dyn s
         span.fragment()
     );
 
-    let mut nodes = Vec::new();
+    let mut nodes = Vec::with_capacity(8);
     let mut remaining = span;
 
     // Safety: prevent infinite loops
@@ -120,6 +120,56 @@ pub fn parse_inlines_from_span(span: GrammarSpan) -> Result<Vec<Node>, Box<dyn s
         }
         last_offset = start_pos;
 
+        // ---------------------------------------------------------------
+        // Fast path: skip all ~25 parser attempts for bytes that cannot
+        // possibly start any special inline sequence.
+        //
+        // Special ASCII bytes (can open a parser):
+        //   * _ ` [ < ! & \n \\ $ ^ ~ = -
+        // Space (0x20) is usually plain text but "  \n" (2+ spaces + newline)
+        // forms a hard line break — let full dispatch handle that case.
+        // Any byte >= 0x80 may start a multi-byte character (e.g. ˅ U+02C5)
+        // so we leave those for the full dispatch.
+        // ---------------------------------------------------------------
+        // SAFETY: the loop condition guarantees remaining is non-empty.
+        let first_byte = remaining.fragment().as_bytes()[0];
+        let is_non_special_ascii = first_byte < 0x80
+            && !matches!(
+                first_byte,
+                b'*' | b'_'
+                    | b'`'
+                    | b'['
+                    | b'<'
+                    | b'!'
+                    | b'&'
+                    | b'\n'
+                    | b'\\'
+                    | b'$'
+                    | b'^'
+                    | b'~'
+                    | b'='
+                    | b'-'
+            );
+        // Guard spaces: "  \n" is a hard line break — let the full loop handle it.
+        let safe_to_fast_path = is_non_special_ascii
+            && if first_byte == b' ' {
+                let frag = remaining.fragment().as_bytes();
+                let sp = frag.iter().take_while(|&&b| b == b' ').count();
+                !(sp >= 2 && frag.get(sp) == Some(&b'\n'))
+            } else {
+                true
+            };
+        if safe_to_fast_path {
+            if let Ok((rest, node)) = parse_text(remaining) {
+                nodes.push(node);
+                remaining = rest;
+                continue;
+            }
+            // parse_text failed: the position may start a GFM autolink literal,
+            // an emoji shortcode, a platform mention, or trailing hard-break spaces.
+            // Fall through to the full dispatch so those parsers get a chance.
+        }
+
         // Try parsing code span first (highest priority to avoid conflicts)
         if let Ok((rest, node)) = parse_code_span(remaining) {
             nodes.push(node);
@@ -128,17 +178,19 @@ pub fn parse_inlines_from_span(span: GrammarSpan) -> Result<Vec<Node>, Box<dyn s
         }
 
         // Try parsing display math before inline math (avoid $$ being parsed as two $)
-        if let Ok((rest, node)) = parse_display_math(remaining) {
-            nodes.push(node);
-            remaining = rest;
-            continue;
-        }
+        if crate::parser::shared::parse_math_enabled() {
+            if let Ok((rest, node)) = parse_display_math(remaining) {
+                nodes.push(node);
+                remaining = rest;
+                continue;
+            }
 
-        // Try parsing inline math
-        if let Ok((rest, node)) = parse_inline_math(remaining) {
-            nodes.push(node);
-            remaining = rest;
-            continue;
+            // Try parsing inline math
+            if let Ok((rest, node)) = parse_inline_math(remaining) {
+                nodes.push(node);
+                remaining = rest;
+                continue;
+            }
         }
 
         // Try parsing backslash escape (before other inline elements)
@@ -180,7 +232,7 @@ pub fn parse_inlines_from_span(span: GrammarSpan) -> Result<Vec<Node>, Box<dyn s
             if let Ok((rest, consumed)) = take::<_, _, nom::error::Error<_>>(run_len)(remaining) {
                 nodes.push(Node {
                     kind: NodeKind::Text("_".repeat(run_len)),
-                    span: Some(to_parser_span(consumed)),
+                    span: opt_span(consumed),
                     children: Vec::new(),
                 });
                 remaining = rest;
@@ -211,7 +263,7 @@ pub fn parse_inlines_from_span(span: GrammarSpan) -> Result<Vec<Node>, Box<dyn s
             continue;
         }
 
-        // Marco extension: inline footnotes `^[...]`.
+        // Extended syntax: inline footnotes `^[...]`.
         // Try before superscript since both start with '^'.
         if let Ok((rest, (ref_node, def_node))) = parse_inline_footnote(remaining) {
             nodes.push(ref_node);
@@ -260,7 +312,7 @@ pub fn parse_inlines_from_span(span: GrammarSpan) -> Result<Vec<Node>, Box<dyn s
             continue;
         }
 
-        // Marco extension: inline task checkbox markers mid-paragraph.
+        // Extended syntax: inline task checkbox markers mid-paragraph.
         // This must come before link parsing since it starts with '['.
         if is_task_checkbox_inline_start_boundary_ok(&nodes, remaining.fragment()) {
             if let Ok((rest, node)) = parse_task_checkbox_inline(remaining) {
@@ -323,14 +375,14 @@ pub fn parse_inlines_from_span(span: GrammarSpan) -> Result<Vec<Node>, Box<dyn s
             continue;
         }
 
-        // Try parsing emoji shortcodes (Marco extension), e.g. :joy:
+        // Try parsing emoji shortcodes (extended syntax), e.g. :joy:
         if let Ok((rest, node)) = parse_emoji_shortcode(remaining) {
             nodes.push(node);
             remaining = rest;
             continue;
         }
 
-        // Try parsing platform mentions (Marco extension), e.g. @user[github](Name)
+        // Try parsing platform mentions (extended syntax), e.g. @user[github](Name)
         if let Ok((rest, node)) = parse_platform_mention(remaining) {
             nodes.push(node);
             remaining = rest;

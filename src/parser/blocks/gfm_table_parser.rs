@@ -9,7 +9,7 @@
 //! Cell contents are parsed with the inline parser so emphasis/links/etc work
 //! inside table cells.
 
-use super::shared::{to_parser_span, GrammarSpan};
+use super::shared::{opt_span, GrammarSpan};
 use crate::grammar::blocks::gfm_table::{split_pipe_row_cells, GfmTableBlock};
 use crate::parser::ast::{Node, NodeKind, TableAlignment};
 use nom::Input;
@@ -26,7 +26,7 @@ pub fn parse_gfm_table<'a>(
 ) -> Node {
     // `full_end` is the remainder span returned by the grammar parser, so we
     // must use exclusive range semantics here.
-    let span = crate::parser::shared::to_parser_span_range(full_start, full_end);
+    let span = crate::parser::shared::opt_span_range(full_start, full_end);
 
     let header_cells = split_pipe_row_cells(table.header_line);
     let delimiter_cells = split_pipe_row_cells(table.delimiter_line);
@@ -64,7 +64,7 @@ pub fn parse_gfm_table<'a>(
 
     Node {
         kind: NodeKind::Table { alignments },
-        span: Some(span),
+        span,
         children: rows,
     }
 }
@@ -76,7 +76,7 @@ pub(crate) fn parse_table_row<'a>(
     alignments: &[TableAlignment],
     column_count: usize,
 ) -> Node {
-    let row_span = to_parser_span(row_line);
+    let row_span = opt_span(row_line);
 
     normalize_cells_to_column_count(&mut cells, row_line, column_count);
 
@@ -91,7 +91,7 @@ pub(crate) fn parse_table_row<'a>(
 
     Node {
         kind: NodeKind::TableRow { header },
-        span: Some(row_span),
+        span: row_span,
         children,
     }
 }
@@ -101,7 +101,7 @@ fn parse_table_cell<'a>(
     alignment: TableAlignment,
     cell_span: GrammarSpan<'a>,
 ) -> Node {
-    let span = to_parser_span(cell_span);
+    let span = opt_span(cell_span);
 
     let inline_children = match crate::parser::inlines::parse_inlines_from_span(cell_span) {
         Ok(children) => children,
@@ -109,7 +109,7 @@ fn parse_table_cell<'a>(
             log::warn!("Failed to parse inline elements in table cell: {}", e);
             vec![Node {
                 kind: NodeKind::Text(cell_span.fragment().to_string()),
-                span: Some(span),
+                span,
                 children: Vec::new(),
             }]
         }
@@ -117,7 +117,7 @@ fn parse_table_cell<'a>(
 
     Node {
         kind: NodeKind::TableCell { header, alignment },
-        span: Some(span),
+        span,
         children: inline_children,
     }
 }

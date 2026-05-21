@@ -3,7 +3,7 @@
 //! Parses plain text segments when no inline elements match. Handles special
 //! cases like trailing spaces before newlines and consecutive backticks.
 
-use super::shared::{to_parser_span, GrammarSpan};
+use super::shared::{opt_span, GrammarSpan};
 use crate::parser::ast::{Node, NodeKind};
 use nom::bytes::complete::take;
 use nom::IResult;
@@ -41,13 +41,13 @@ pub fn parse_text(input: GrammarSpan) -> IResult<GrammarSpan, Node> {
         super::gfm_autolink_literal_parser::find_next_autolink_literal_start(text_fragment)
             .unwrap_or(text_fragment.len());
 
-    // Emoji shortcodes (Marco extension) can appear in the middle of a text node.
+    // Emoji shortcodes (extended syntax) can appear in the middle of a text node.
     // Only stop for *recognized* shortcodes; unknown ones remain literal.
     let next_emoji_shortcode =
         super::marco_emoji_shortcode_parser::find_next_emoji_shortcode_start(text_fragment)
             .unwrap_or(text_fragment.len());
 
-    // Platform mentions (Marco extension) can appear in the middle of a text node.
+    // Platform mentions (extended syntax) can appear in the middle of a text node.
     let next_platform_mention =
         super::marco_platform_mentions_parser::find_next_platform_mention_start(text_fragment)
             .unwrap_or(text_fragment.len());
@@ -150,11 +150,11 @@ pub fn parse_text(input: GrammarSpan) -> IResult<GrammarSpan, Node> {
     let text_content = input.take(text_len);
     let rest = input.take_from(text_len);
 
-    let span = to_parser_span(text_content);
+    let span = opt_span(text_content);
 
     let node = Node {
         kind: NodeKind::Text(text_content.fragment().to_string()),
-        span: Some(span),
+        span,
         children: Vec::new(),
     };
 
@@ -198,11 +198,11 @@ pub fn parse_special_as_text(input: GrammarSpan) -> IResult<GrammarSpan, Node> {
 
     let (rest, text_content) = take(char_len).parse(input)?;
 
-    let span = to_parser_span(text_content);
+    let span = opt_span(text_content);
 
     let node = Node {
         kind: NodeKind::Text(text_content.fragment().to_string()),
-        span: Some(span),
+        span,
         children: Vec::new(),
     };
 

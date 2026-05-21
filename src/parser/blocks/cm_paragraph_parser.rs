@@ -3,7 +3,7 @@
 //! Handles conversion of paragraphs from grammar layer to parser AST,
 //! including recursive inline element parsing for emphasis, links, etc.
 
-use super::shared::{to_parser_span, GrammarSpan};
+use super::shared::{opt_span, GrammarSpan};
 use crate::parser::ast::{Node, NodeKind};
 
 use nom::Input;
@@ -30,7 +30,7 @@ use nom::Input;
 /// assert!(!node.children.is_empty()); // Contains inline nodes
 /// ```
 pub fn parse_paragraph(content: GrammarSpan) -> Node {
-    let span = to_parser_span(content);
+    let span = opt_span(content);
 
     // Support task checkbox markers at the start of a paragraph *and* at the
     // start of any subsequent line inside the same paragraph.
@@ -59,10 +59,7 @@ pub fn parse_paragraph(content: GrammarSpan) -> Node {
         let (after_marker, _marker_taken) = remaining.take_split(consumed);
         inline_children.push(Node {
             kind: NodeKind::TaskCheckboxInline { checked },
-            span: Some(crate::parser::shared::to_parser_span_range(
-                remaining,
-                after_marker,
-            )),
+            span: crate::parser::shared::opt_span_range(remaining, after_marker),
             children: Vec::new(),
         });
         remaining = after_marker;
@@ -73,7 +70,7 @@ pub fn parse_paragraph(content: GrammarSpan) -> Node {
 
     Node {
         kind: NodeKind::Paragraph,
-        span: Some(span),
+        span,
         children: inline_children,
     }
 }
@@ -89,7 +86,7 @@ fn parse_inlines_or_fallback_text(input: GrammarSpan) -> Vec<Node> {
             log::warn!("Failed to parse inline elements: {}", e);
             vec![Node {
                 kind: NodeKind::Text(input.fragment().to_string()),
-                span: Some(to_parser_span(input)),
+                span: opt_span(input),
                 children: Vec::new(),
             }]
         }

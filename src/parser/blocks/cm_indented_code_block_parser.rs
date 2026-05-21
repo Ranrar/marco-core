@@ -3,7 +3,7 @@
 //! Handles conversion of indented code blocks (4 spaces or 1 tab indentation)
 //! from grammar layer to parser AST representation.
 
-use super::shared::{to_parser_span, GrammarSpan};
+use super::shared::{opt_span, GrammarSpan};
 use crate::parser::ast::{Node, NodeKind};
 
 /// Parse an indented code block into an AST node.
@@ -25,7 +25,7 @@ use crate::parser::ast::{Node, NodeKind};
 /// assert!(matches!(node.kind, NodeKind::CodeBlock { language: None, .. }));
 /// ```
 pub fn parse_indented_code_block(content: GrammarSpan) -> Node {
-    let span = to_parser_span(content);
+    let span = opt_span(content);
 
     // Remove indentation from the code (4 spaces or 1 tab per line)
     let code = content
@@ -44,7 +44,7 @@ pub fn parse_indented_code_block(content: GrammarSpan) -> Node {
             language: None, // Indented code blocks don't have language
             code,
         },
-        span: Some(span),
+        span,
         children: Vec::new(),
     }
 }

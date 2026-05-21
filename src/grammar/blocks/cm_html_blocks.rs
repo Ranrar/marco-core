@@ -21,6 +21,7 @@ use nom::{
 
 // HTML Block Type 2: Comments
 // Parses <!-- ... --> on its own line(s)
+/// Parse a CommonMark HTML block comment (`<!-- ... -->`).
 pub fn html_comment(input: Span) -> IResult<Span, Span> {
     log::debug!(
         "Trying HTML comment at: {:?}",
@@ -57,6 +58,7 @@ pub fn html_comment(input: Span) -> IResult<Span, Span> {
 
 // HTML Block Type 3: Processing Instructions
 // Parses <?...?>
+/// Parse an HTML processing instruction block (`<? ... ?>`).
 pub fn html_processing_instruction(input: Span) -> IResult<Span, Span> {
     log::debug!(
         "Trying processing instruction at: {:?}",
@@ -96,6 +98,7 @@ pub fn html_processing_instruction(input: Span) -> IResult<Span, Span> {
 
 // HTML Block Type 4: Declarations
 // Parses <!X...> where X is ASCII letter
+/// Parse an HTML declaration block (`<!DOCTYPE ...>`-style).
 pub fn html_declaration(input: Span) -> IResult<Span, Span> {
     log::debug!(
         "Trying HTML declaration at: {:?}",
@@ -144,6 +147,7 @@ pub fn html_declaration(input: Span) -> IResult<Span, Span> {
 
 // HTML Block Type 5: CDATA Sections
 // Parses <![CDATA[...]]>
+/// Parse an HTML CDATA block (`<![CDATA[ ... ]]>`).
 pub fn html_cdata(input: Span) -> IResult<Span, Span> {
     log::debug!(
         "Trying CDATA section at: {:?}",
@@ -183,6 +187,7 @@ pub fn html_cdata(input: Span) -> IResult<Span, Span> {
 
 // HTML Block Type 1: Special Raw Content Tags (script, pre, style, textarea)
 // These consume content until closing tag, can contain blank lines
+/// Parse special raw HTML blocks (`script`, `pre`, `style`, `textarea`).
 pub fn html_special_tag(input: Span) -> IResult<Span, Span> {
     log::debug!(
         "Trying special HTML tag at: {:?}",
@@ -340,6 +345,7 @@ const BLOCK_TAGS: &[&str] = &[
     "ul",
 ];
 
+/// Parse a standard block-tag HTML block (CommonMark type 6).
 pub fn html_block_tag(input: Span) -> IResult<Span, Span> {
     log::debug!(
         "Trying block HTML tag at: {:?}",
@@ -480,6 +486,7 @@ pub fn html_block_tag(input: Span) -> IResult<Span, Span> {
 // Must be a complete open or closing tag on a line by itself (followed only by spaces/tabs)
 // Cannot interrupt paragraphs (must be handled specially by caller)
 // IMPORTANT: This must validate that the tag is well-formed per CommonMark spec
+/// Parse a complete-tag HTML block line per CommonMark type 7 rules.
 pub fn html_complete_tag(input: Span) -> IResult<Span, Span> {
     log::debug!(
         "Trying complete HTML tag at: {:?}",

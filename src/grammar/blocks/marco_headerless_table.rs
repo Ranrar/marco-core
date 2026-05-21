@@ -1,4 +1,4 @@
-// Marco extension: "headerless" pipe tables
+// Extended syntax: "headerless" pipe tables
 //
 // Syntax (extension):
 // - First line is a valid GFM delimiter row (pipes + '-' + optional ':' for alignment)
@@ -23,16 +23,19 @@ use nom::character::complete::{line_ending, not_line_ending};
 use nom::IResult;
 
 #[derive(Debug, Clone, PartialEq)]
+/// Parsed extended headerless table spans (delimiter plus body rows).
 pub struct MarcoHeaderlessTableBlock<'a> {
+    /// Delimiter row span.
     pub delimiter_line: Span<'a>,
+    /// Body row spans.
     pub body_lines: Vec<Span<'a>>,
 }
 
-/// Parse a Marco "headerless" pipe table starting at the current position.
+/// Parse an extended "headerless" pipe table starting at the current position.
 ///
 /// Returns the consumed table (delimiter+rows) as spans that reference the
 /// original input.
-pub fn marco_headerless_table(input: Span<'_>) -> IResult<Span<'_>, MarcoHeaderlessTableBlock<'_>> {
+pub fn headerless_table(input: Span<'_>) -> IResult<Span<'_>, MarcoHeaderlessTableBlock<'_>> {
     // Table blocks can't start with 4+ spaces (would be indented code).
     if count_indentation(input.fragment()) >= 4 {
         return Err(nom::Err::Error(nom::error::Error::new(
@@ -186,7 +189,7 @@ mod tests {
     #[test]
     fn smoke_test_headerless_table_parses_basic() {
         let input = Span::new("|--------|--------|--------|\n| Data 1 | Data 2 | Data 3 |\n| Data 4 | Data 5 | Data 6 |\n");
-        let (rest, table) = marco_headerless_table(input).expect("should parse headerless table");
+        let (rest, table) = headerless_table(input).expect("should parse headerless table");
         assert!(rest.fragment().is_empty());
         assert_eq!(split_pipe_row_cells(table.delimiter_line).len(), 3);
         assert_eq!(table.body_lines.len(), 2);
@@ -196,13 +199,13 @@ mod tests {
     #[test]
     fn smoke_test_headerless_table_rejects_missing_body_row() {
         let input = Span::new("|---|---|\n");
-        assert!(marco_headerless_table(input).is_err());
+        assert!(headerless_table(input).is_err());
     }
 
     #[test]
     fn smoke_test_headerless_table_rejects_regular_gfm_table() {
         // Regular table should be handled by the GFM parser, not this extension.
         let input = Span::new("| a | b |\n|---|---|\n| 1 | 2 |\n");
-        assert!(marco_headerless_table(input).is_err());
+        assert!(headerless_table(input).is_err());
     }
 }

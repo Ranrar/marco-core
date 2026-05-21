@@ -70,7 +70,7 @@ Single crate `marco-core` with the following module layout under `src/`:
 | `parser/` | AST builders that consume grammar output (`ast.rs`, `position.rs`, `blocks/`, `inlines/`) |
 | `render/` | HTML renderer (entity escaping, syntect highlighting, KaTeX, Mermaid) |
 | `intelligence/` | Editor features: highlights, diagnostics, completions, hover, TOC |
-| `logic/` | Pure Rust support: cache, logger, UTF-8 sanitization, text completion |
+| `logic/` | Pure Rust support: logger, UTF-8 sanitization, text completion |
 
 ### Parser Pipeline
 
@@ -117,7 +117,6 @@ pub use parser::parse;
 pub use parser::{Document, Node, NodeKind};
 pub use render::{render, RenderOptions};
 pub use intelligence::MarkdownIntelligenceProvider;
-pub use logic::cache::{parse_to_html, parse_to_html_cached, ParserCache};
 pub use logic::utf8::{sanitize_input, sanitize_input_with_stats, InputSource, SanitizeStats};
 ```
 
@@ -186,18 +185,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn smoke_test_parser_cache() {
-        let cache = SimpleParserCache::new();
-        let content = "# Hello World\n\nThis is a **test** document.";
-
-        let _ast1 = cache.parse_with_cache(content).expect("parse failed");
-        let stats = cache.stats();
-        assert_eq!(stats.ast_misses, 1);
-        assert_eq!(stats.ast_hits, 0);
-
-        let _ast2 = cache.parse_with_cache(content).expect("parse failed");
-        let stats = cache.stats();
-        assert_eq!(stats.ast_hits, 1);
+    fn smoke_test_sanitize_then_parse() {
+        let raw = b"# Hello\n\nParagraph with \0 null byte.";
+        let clean = crate::sanitize_input(raw, crate::InputSource::File);
+        
+        let doc = crate::parse(&clean).expect("parse failed");
+        assert!(doc.children.len() > 0);
+        
+        let html = crate::render(&doc, &crate::RenderOptions::default()).expect("render failed");
+        assert!(html.contains("<h1"));
+        assert!(!html.contains("\0"), "null byte should be stripped");
     }
 }
 ```

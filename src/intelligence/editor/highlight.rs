@@ -3,56 +3,102 @@
 use crate::parser::{Document, Node, NodeKind, Position, Span};
 
 #[derive(Debug, Clone, PartialEq)]
+/// A highlight range paired with its semantic tag.
 pub struct Highlight {
+    /// Source span where the highlight applies.
     pub span: Span,
+    /// Semantic highlight classification for the span.
     pub tag: HighlightTag,
 }
 
 #[derive(Debug, Clone, PartialEq)]
+/// Highlight classifications produced from Markdown AST nodes.
 pub enum HighlightTag {
+    /// Level-1 heading token.
     Heading1,
+    /// Level-2 heading token.
     Heading2,
+    /// Level-3 heading token.
     Heading3,
+    /// Level-4 heading token.
     Heading4,
+    /// Level-5 heading token.
     Heading5,
+    /// Level-6 heading token.
     Heading6,
+    /// Emphasis inline token.
     Emphasis,
+    /// Strong inline token.
     Strong,
+    /// Strikethrough inline token.
     Strikethrough,
+    /// Mark/highlight inline token.
     Mark,
+    /// Superscript inline token.
     Superscript,
+    /// Subscript inline token.
     Subscript,
+    /// Link inline token.
     Link,
+    /// Image inline token.
     Image,
+    /// Inline code span token.
     CodeSpan,
+    /// Fenced or indented code block token.
     CodeBlock,
+    /// Inline HTML token.
     InlineHtml,
+    /// Hard line break token.
     HardBreak,
+    /// Soft line break token.
     SoftBreak,
+    /// Thematic break token.
     ThematicBreak,
+    /// Blockquote token.
     Blockquote,
+    /// Admonition block token.
     Admonition,
+    /// Block HTML token.
     HtmlBlock,
+    /// List container token.
     List,
+    /// List item token.
     ListItem,
+    /// Checked task checkbox token.
     TaskCheckboxChecked,
+    /// Unchecked task checkbox token.
     TaskCheckboxUnchecked,
+    /// Table container token.
     Table,
+    /// Non-header table row token.
     TableRow,
+    /// Header table row token.
     TableRowHeader,
+    /// Non-header table cell token.
     TableCell,
+    /// Header table cell token.
     TableCellHeader,
+    /// Reference-style link token.
     LinkReference,
+    /// Definition list container token.
     DefinitionList,
+    /// Definition term token.
     DefinitionTerm,
+    /// Definition description token.
     DefinitionDescription,
+    /// `:::tab` container marker token.
     TabBlockContainer,
+    /// `@tab` header marker token.
     TabBlockHeader,
+    /// Slider deck start/end marker token.
     SliderDeckMarker,
+    /// Horizontal slider separator (`---`) token.
     SliderSeparatorHorizontal,
+    /// Vertical slider separator (`--`) token.
     SliderSeparatorVertical,
 }
 
+/// Compute semantic highlights from the parsed document AST.
 pub fn compute_highlights(document: &Document) -> Vec<Highlight> {
     let mut highlights = Vec::new();
 
@@ -63,6 +109,7 @@ pub fn compute_highlights(document: &Document) -> Vec<Highlight> {
     finalize_highlights(highlights)
 }
 
+/// Compute semantic highlights and include marker-based highlights derived from source text.
 pub fn compute_highlights_with_source(document: &Document, source: &str) -> Vec<Highlight> {
     let mut highlights = compute_highlights(document);
     highlights.extend(compute_tab_block_marker_highlights(source));

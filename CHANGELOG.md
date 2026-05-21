@@ -5,37 +5,358 @@ This project follows **Semantic Versioning** and uses the **Keep a Changelog** f
 
 Version scheme note: `marco-core` and `marco-shared` follow independent semver from the application binaries (marco/polo). The library tracks API stability for crates.io consumers; breaking API changes increment the major version.
 
-## [Unreleased]
+## [1.1.0] - 2026-05-08
+
+### Removed
+
+#### `cache` feature and `ParserCache` API
+
+The `cache` feature (backed by `moka`) and its public types — `ParserCache`,
+`parse_to_html`, `parse_to_html_cached` — have been removed from `marco-core`.
+
+Caching is application-level concern. Downstream consumers that need parse or
+render caching should implement it directly (e.g. wrapping `parse` + `render`
+in a `HashMap` or `moka::sync::Cache` keyed by content hash).
+
+The `moka` dependency is no longer pulled in by default.
 
 ### Added
-- CommonMark spec conformance test (`tests/commonmark_spec_conformance.rs`)
+
+#### Public crate version constant
+
+`marco-core` now exports `VERSION` from the crate root (`marco_core::VERSION`),
+backed by `env!("CARGO_PKG_VERSION")`, so downstream apps can display the
+library version in About dialogs and diagnostics.
+
+#### `ParseOptions` and `parse_with_options` — runtime parser control
+
+New public API that lets callers tune parse behaviour per-call without changing
+compile-time features:
+
+| Option | Default | Effect when `false` |
+|---|---|---|
+| `track_positions` | `true` | Skips O(n) span construction; nodes carry `span: None` |
+| `parse_math` | `true` | Skips display-math and inline-math grammar branches |
+| `parse_diagrams` | `true` | Skips mermaid fenced-code-block detection |
+
+`parse_with_options(input, opts)` installs a `ParseOptionsGuard` that restores
+the previous per-thread values on return or panic (RAII, thread-local).
+`parse(input)` is unchanged and continues to enable all options.
+
+#### Compile-time feature flags — eight optional feature gates
+
+`Cargo.toml` now declares a `[features]` table with eight flags, all on by default:
+
+| Feature | Gates |
+|---|---|
+| `render-math` | KaTeX math rendering (`dep:katex-rs`) |
+| `render-diagrams` | Mermaid diagram rendering (`dep:mermaid-rs-renderer`) |
+| `render-syntax-highlighting` | syntect code highlighting (`dep:syntect`) |
+| `file-logger` | `SimpleFileLogger`, log rotation, log-path helpers |
+| `intelligence-highlights` | `MarkdownIntelligenceProvider::highlights` (implies `render-syntax-highlighting`) |
+| `intelligence-diagnostics` | `::diagnostics` and the analysis sub-module |
+| `intelligence-completions` | `::completions` |
+| `intelligence-hover` | `::hover` and `::get_position_span` |
+
+Building with `--no-default-features` produces a minimal parser + renderer with
+no optional dependencies. All 25 test suites pass in both configurations.
+Test files that exercise optional APIs are gated with `#![cfg(feature = "...")]`.
+
+#### `marco-core-raw` perf-lab engine adapter
+
+A new `"marco-core-raw"` engine for `perf-lab compare` calls `parse_with_options`
+with all three cost-saving options disabled, making it easy to measure the
+runtime overhead of each opt-in feature in isolation.
+
+#### `tools/perf-lab` — performance and regression benchmarking crate
+A standalone `publish = false` Rust crate under `tools/perf-lab/` that provides
+direct-timing benchmarks, stress testing, cross-engine comparison, artifact
+management, and a CI-ready regression gate for `marco-core`.
+
+Five subcommands:
+
+| Subcommand | Purpose |
+|---|---|
+| `perf-lab bench` | Direct-timing benchmark — measures parse/render/e2e latency, writes `BenchRecord` JSON/CSV/Markdown artifacts |
+| `perf-lab stress` | Stress harness — drives the parser at concurrency, captures per-sample stats and throughput |
+| `perf-lab compare` | In-process speedup table against pulldown-cmark and comrak |
+| `perf-lab report` | Artifact re-render; ingests hyperfine JSON for unified reporting |
+| `perf-lab regression` | Regression gate — loads two `BenchRecord` JSON files, exits 1 when hard-failure count meets `--min-failures` threshold |
+
+Shell wrappers under `tools/perf-lab/scripts/`:
+`run-bench.sh`, `run-stress.sh`, `run-compare.sh`, `run-hyperfine.sh`, `run-regression.sh`.
+
+Engine adapters: `pulldown-cmark 0.13`, `comrak 0.52` (no-default-features).
+
+#### `.github/workflows/ci-perf.yml` — two-stage performance CI
+- **Stage A** (push to `main`): builds release, runs `bench --mode e2e --iterations 30` and `bench --mode parse --iterations 30`, uploads a `BenchRecord` JSON artifact (30-day retention, keyed by `${{ github.sha }}`).
+- **Stage B** (pull request): runs `bench --iterations 20` on the PR branch, downloads the base-SHA artifact, calls `perf-lab regression --warn-threshold 10 --fail-threshold 20 --min-failures 2`. Skips gracefully when no baseline artifact exists.
+
+#### `.github/workflows/update-crate.yml` — crates.io update preflight
+Manual `workflow_dispatch` workflow that runs `cargo publish --dry-run` and all
+quality gates (`fmt`, `clippy -D warnings`, `test`) to validate the crate before
+a real `cargo publish`.
+
+#### `tools/marco-ast` — AST introspection CLI tool
+Standalone `publish = false` binary crate (`tools/marco-ast/`) for inspecting the
+`marco-core` parse tree. Supports text, JSON, and interactive tree-walk output
+modes. Useful for debugging grammar and parser changes.
+
+#### `tools/spec/` — CommonMark and extension specification fixtures
+Spec fixture JSON files relocated from `tests/spec/` to `tools/spec/`:
+`commonmark.json`, `gfm.json`, `marco.json`, `diagram.json`, and `README.md`.
+The `Cargo.toml` `include` list updated accordingly so the published `.crate`
+tarball continues to ship the fixtures.
+
+#### `tools/tests/extension_spec_it.rs` — extension spec conformance test
+Integration test for Marco-specific extension spec fixtures (loaded from
+`tools/spec/marco.json` and `tools/spec/diagram.json`). Registered in
+`Cargo.toml` as a named `[[test]]` target (`extension_spec_it`).
+
+#### `Documentation/` — developer reference documents
+| File | Purpose |
+|---|---|
+| `Documentation/testing.md` | Integration test inventory (676 total, 93 integration across 23 files) |
+| `Documentation/tools.md` | Full developer reference for the `perf-lab` tooling |
+| `Documentation/API Naming Standard.md` | CSS class and custom-property naming conventions |
+| `Documentation/COMPARISON_RAW_vs_FULL_FEATURED.md` | Benchmark comparison: marco-core vs pulldown-cmark vs comrak |
+
+### Changed
+
+#### Parser and renderer — targeted performance improvements
+
+Five changes that reduce parse+render latency by **10–37%** on typical workloads
+with no API or feature changes:
+
+1. **`to_parser_span` — single-pass newline scan** (`src/parser/shared.rs`)
+   Replaced two separate O(n) passes (`matches('\n').count()` + `rfind('\n')`)
+   with a single byte-scan loop that computes `newline_count` and `last_nl` together.
+
+2. **Inline loop — first-byte fast-path** (`src/parser/inlines/mod.rs`)
+   Normal prose bytes (`a-z`, `A-Z`, `0-9`, `.`, `,`, space, …) were triggering ~25
+   sequential parser attempts before reaching `parse_text`. A first-byte dispatch
+   now jumps straight to `parse_text` for bytes that cannot start any special inline
+   sequence. Guarded edge cases: hard line break (`≥2 spaces + \n`), GFM autolink
+   literals, emoji shortcodes, and platform mentions all still fall through to full
+   dispatch when needed.
+
+3. **`normalize_label` — no intermediate Vec** (`src/parser/ast.rs`)
+   `split_whitespace().collect::<Vec<_>>().join(" ")` on every link reference lookup
+   replaced with a direct `String` write loop.
+
+4. **HTML renderer — allocation reductions** (`src/render/markdown.rs`)
+   - Output `String` pre-allocated with `with_capacity(nodes × 64)` to reduce
+     early reallocations.
+   - Heading level rendered as a `char` via `char::from_digit` (no `to_string()` heap alloc).
+   - `escape_html(&effective_id)` computed once and reused for both the `id` attribute
+     and the anchor `href`.
+   - `format!("<li id=\"fn{}\">" , n)` and `format!(" class=\"language-{}\"", …)`
+     hot paths replaced with `push_str` / `push` chains.
+
+5. **`parse_inlines_from_span` — Vec capacity hint** (`src/parser/inlines/mod.rs`)
+   Inline node accumulator seeded with `Vec::with_capacity(8)` to avoid
+   reallocation on the first few nodes.
+
+Before / after (parse mode, 50-iteration mean, release build):
+
+| Workload | Before (ns) | After (ns) | Δ |
+|---|---|---|---|
+| small (~1 KB) | 6 472 | 5 003 | −23% |
+| medium (~10 KB) | 146 263 | 91 524 | −37% |
+| large (~100 KB) | 2 727 867 | 2 103 670 | −23% |
+| pathological | 11 516 501 | 9 127 307 | −21% |
+| spec:gfm | 433 231 | 361 778 | −16% |
+
+#### Integration tests — file names standardised to `*_it.rs`
+All 23 integration test files under `tests/` were renamed to the `*_it.rs`
+suffix pattern, replacing the previous mixed `*_integration.rs` naming.
+
+| Previous name | New name |
+|---|---|
+| `autolink_highlighting.rs` | `autolink_highlighting_it.rs` |
+| `commonmark_features_integration.rs` | `commonmark_features_it.rs` |
+| `commonmark_spec_conformance.rs` | `commonmark_spec_it.rs` |
+| `extended_definition_lists_integration.rs` | `definition_lists_it.rs` |
+| `extended_heading_ids_integration.rs` | `heading_ids_it.rs` |
+| `gfm_admonitions_integration.rs` | `gfm_admonitions_it.rs` |
+| `gfm_autolink_literals_integration.rs` | `gfm_autolinks_it.rs` |
+| `gfm_footnotes_integration.rs` | `gfm_footnotes_it.rs` |
+| `gfm_table_integration.rs` | `gfm_tables_it.rs` |
+| `gfm_tasklist_integration.rs` | `gfm_tasklist_it.rs` |
+| `heading_anchor_links_integration.rs` | `heading_anchor_links_it.rs` |
+| `highlighting_integration.rs` | `highlighting_it.rs` |
+| `html_autolink_integration.rs` | `html_autolink_it.rs` |
+| `html_block_single_line_integration.rs` | `html_block_single_line_it.rs` |
+| `intelligence_provider_integration.rs` | `intelligence_provider_it.rs` |
+| `marco_emoji_shortcode_integration.rs` | `marco_emoji_shortcode_it.rs` |
+| `marco_headerless_table_integration.rs` | `marco_headerless_table_it.rs` |
+| `marco_inline_footnotes_integration.rs` | `marco_inline_footnotes_it.rs` |
+| `marco_sliders_integration.rs` | `marco_sliders_it.rs` |
+| `marco_tab_blocks_integration.rs` | `marco_tab_blocks_it.rs` |
+| `platform_mentions_integration.rs` | `platform_mentions_it.rs` |
+| `sanitize_input_integration.rs` | `sanitize_input_it.rs` |
+
+#### Rust Grammar API — doc-comments added to all public grammar types
+All public grammar structs, enums, and functions in `src/grammar/` now carry
+Rust doc-comments (`///` / `//!`), improving `cargo doc` output for crates.io
+consumers.
+
+#### Module-level doc-comments added throughout the codebase
+`src/lib.rs`, `src/parser/mod.rs`, `src/render/options.rs`, `src/logic/mod.rs`,
+`src/logic/logger.rs`, and all intelligence sub-modules now use `//!` inner
+doc-comments, with the crate root exposing a runnable example in the top-level
+rustdoc.
+
+#### `.gitignore` — trimmed and updated for standalone crate layout
+Removed coverage artifacts, legacy IDE config entries, and Windows thumbnails;
+added `marco-core.code-workspace` and per-tool `target/` ignores
+(`/tools/marco-ast/target/`, `/tools/perf-lab/target/`).
+
+#### `devskim.yml` — ignore-glob path updated
+Spec fixture ignore path updated from `**/tests/spec/**` to `**/tools/spec/**`
+to match the relocated fixture directory.
+
+#### `CONTRIBUTING.md` — spec test path references updated
+`MARCO_SPEC_VERBOSE=1` example command and file path reference updated to
+`tests/commonmark_spec_it.rs` (from the old `tests/commonmark_spec_conformance.rs`).
+
+#### `src/logic/logger.rs` — smoke tests and documentation
+Added `#[cfg(test)]` smoke tests for file logger initialisation; editorial
+doc-comments clarified platform-specific paths to avoid editor-specific
+references.
+
+#### CI workflows — reshaped for standalone library
+`ci-linux.yml` installs only `pkg-config` + `libfontconfig-dev`, runs
+`cargo fmt` / `clippy -D warnings` / `test` / doc-tests.
+`ci-windows.yml` switched to native MSVC (no MSYS2/GTK setup).
+`publish-crate.yml` triggers on `v*` tags, runs `cargo publish --dry-run` before publishing.
+`README.md` rewritten with a top-down pipeline ASCII diagram, a complete module/file map,
+supported-Markdown matrix, and runnable usage snippets.
+`.github/instructions/rust.instructions.md` retargeted at the
+pure-Rust library context (removed GTK/GUI guidance).
+
+#### Rust Grammar API — namespaced symbol renames
+The public grammar types and parser functions for Marco-specific block extensions
+now carry the `Marco` prefix (structs) or `marco_` prefix (functions), aligning
+them with the `marco_*` file-naming convention and making their origin unambiguous
+to crates.io consumers.
+
+| Previous name | New name | File |
+|---|---|---|
+| `Slide` | `MarcoSlide` | `src/grammar/blocks/marco_sliders.rs` |
+| `SlideDeck` | `MarcoSlideDeck` | `src/grammar/blocks/marco_sliders.rs` |
+| `slide_deck()` | `marco_slide_deck()` | `src/grammar/blocks/marco_sliders.rs` |
+| `TabItem` | `MarcoTabItem` | `src/grammar/blocks/marco_tab_blocks.rs` |
+| `TabBlock` | `MarcoTabBlock` | `src/grammar/blocks/marco_tab_blocks.rs` |
+| `tab_block()` | `marco_tab_block()` | `src/grammar/blocks/marco_tab_blocks.rs` |
+| `HeaderlessTableBlock` | `MarcoHeaderlessTableBlock` | `src/grammar/blocks/marco_headerless_table.rs` |
+
+#### HTML render — namespaced CSS class and custom-property renames
+All runtime class names emitted by the renderer and defined in the embedded base
+stylesheet now use the `marco-` namespace (BEM blocks) or `mc-` namespace (CSS
+custom properties), preventing collisions with host-page styles.
+
+**Sliders** (`marco-sliders` block):
+
+| Previous class | New class |
+|---|---|
+| `slideshow` | `marco-sliders` |
+| `slideshow__viewport` | `marco-sliders__viewport` |
+| `slideshow__slide` | `marco-sliders__slide` |
+| `slideshow__controls` | `marco-sliders__controls` |
+| `slideshow__btn` | `marco-sliders__btn` |
+| `slideshow__btn--prev` | `marco-sliders__btn--prev` |
+| `slideshow__btn--next` | `marco-sliders__btn--next` |
+| `slideshow__btn--toggle` | `marco-sliders__btn--toggle` |
+| `slideshow__icon` | `marco-sliders__icon` |
+| `slideshow__icon--play` | `marco-sliders__icon--play` |
+| `slideshow__icon--pause` | `marco-sliders__icon--pause` |
+| `slideshow__dots` | `marco-sliders__dots` |
+| `slideshow__dot` | `marco-sliders__dot` |
+| `slideshow__dot-icon` | `marco-sliders__dot-icon` |
+| `slideshow__dot-icon--active` | `marco-sliders__dot-icon--active` |
+| `slideshow__dot-icon--inactive` | `marco-sliders__dot-icon--inactive` |
+
+**Tab blocks** (`marco-tabs` block):
+
+| Previous class | New class |
+|---|---|
+| `tabset` | `marco-tabs` |
+| `tabset__radio` | `marco-tabs__radio` |
+| `tabset__tablist` | `marco-tabs__tablist` |
+| `tabset__tab` | `marco-tabs__tab` |
+| `tabset__panels` | `marco-tabs__panels` |
+| `tabset__panel` | `marco-tabs__panel` |
+
+**Task list**:
+
+| Previous class | New class |
+|---|---|
+| `task-list-item` | `marco-task-list-item` |
+| `task-list-item-checkbox` | `marco-task-checkbox` |
+| `task-checkbox` | `marco-task-checkbox` |
+| `task-icon` | `marco-task-icon` |
+| `task-check` | `marco-task-check` |
+| `task-box` | `marco-task-box` |
+
+**Code blocks, headings, and inline elements**:
+
+| Previous class | New class |
+|---|---|
+| `code-block` | `marco-code-block` |
+| `copy-button` | `marco-copy-btn` |
+| `heading-anchor` | `marco-heading-anchor` |
+| `mention` / `mention-*` | `marco-mention` / `marco-mention-*` |
+| `autolink` | `marco-autolink` |
+| `inline-footnote` | `marco-inline-footnote` |
+| `emoji` | `marco-emoji` |
+| `diagram` | `marco-diagram` |
+| `table-auto-align` | `marco-table-auto-align` |
+| `table-resizing` | `marco-table-resizing` |
+| `resize-active` | `marco-resize-active` |
+
+**CSS custom properties**:
+
+| Previous property | New property |
+|---|---|
+| `--task-primary` | `--mc-task-primary` |
+| `--task-accent` | `--mc-task-accent` |
+| `--slideshow-border` | `--mc-sliders-border` |
+| `--slideshow-bg` | `--mc-sliders-bg` |
+
+#### Preview document — namespaced HTML IDs and JS bridge rename
+The preview document wrapper (`src/render/preview_document.rs`) now uses the
+`mc-` prefix for HTML element IDs and exposes the JavaScript bridge under a
+stable namespaced global.
+
+| Previous value | New value |
+|---|---|
+| `id="content-container"` | `id="mc-content-container"` |
+| `id="preview-style"` | `id="mc-preview-style"` |
+| `id="preview-internal-style"` | `id="mc-preview-internal-style"` |
+| `id="paged-page-css"` | `id="mc-paged-page-css"` |
+| `id="print-export-css"` | `id="mc-print-export-css"` |
+| `window.PreviewBridge` | `window.MarcoCorePreview` |
+| `document.title = 'paged_ready'` | `document.title = 'mc_paged_ready'` |
+
+### Fixed
+- Broken import in `src/parser/blocks/marco_headerless_table_parser.rs` that
+  referenced a stale module path (`headerless_table`) instead of the correct
+  `marco_headerless_table` module, which caused a compile error in test builds.
+
+- CommonMark spec conformance test (`tests/commonmark_spec_it.rs`)
   loading the official 652 examples (and a small set of Marco extras) from
-  `tests/spec/*.json`, with a regression-guard baseline. Set
+  `tools/spec/*.json`, with a regression-guard baseline. Set
   `MARCO_SPEC_STRICT=1` to require 100% conformance,
   `MARCO_SPEC_VERBOSE=1` to print failing examples.
 - `documentation` key and explicit `include` list in `Cargo.toml`. The
   published `.crate` tarball now ships `src/`, `README.md`, `LICENSE`,
   `Cargo.toml`/`Cargo.lock`, and the spec fixtures
-  (`tests/spec/*.json` + `tests/spec/README.md`) for downstream
+  (`tools/spec/*.json` + `tools/spec/README.md`) for downstream
   conformance verification; everything else (`.github/`, integration
   test sources, `target*/`, `CHANGELOG.md`) stays out.
-- `tests/spec/README.md` documenting the upstream source and
+- `tools/spec/README.md` documenting the upstream source and
   CC-BY-SA 4.0 attribution for `commonmark.json`.
-- `.gitignore` for the standalone-crate layout (covers `target/`,
-  `target-*/`, coverage artifacts, common editor/OS files).
-
-### Changed
-- CI workflows reshaped for the standalone library: `ci-linux.yml` now
-  installs only `pkg-config` + `libfontconfig-dev`, runs
-  `cargo fmt`/`clippy -D warnings`/`test`/doc-tests; `ci-windows.yml`
-  switched to native MSVC (no MSYS2/GTK setup); `publish-crate.yml`
-  triggers on `v*` tags, runs `cargo publish --dry-run` before publishing.
-- `devskim.yml` ignore globs trimmed to the paths that actually exist in
-  this repository.
-- `README.md` rewritten with a top-down pipeline ASCII diagram, a complete
-  module/file map, supported-Markdown matrix, and runnable usage snippets.
-- `.github/instructions/rust.instructions.md` retargeted at the
-  pure-Rust library context (removed GTK/GUI guidance).
 
 ### Removed
 - Stale `target-linux/` build artifact directory left over from the former

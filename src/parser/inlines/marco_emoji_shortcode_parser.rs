@@ -1,4 +1,4 @@
-//! Emoji shortcode parser (Markdown Guide extended syntax; Marco extension)
+//! Emoji shortcode parser (Markdown Guide extended syntax).
 //!
 //! Syntax: `:shortcode:`
 //!
@@ -8,7 +8,7 @@
 //! - Code spans are parsed before this, so ```:joy:``` inside backticks remains
 //!   code and is not converted.
 
-use super::shared::{to_parser_span, GrammarSpan};
+use super::shared::{opt_span, GrammarSpan};
 use crate::parser::ast::{Node, NodeKind};
 use nom::IResult;
 use nom::Input;
@@ -86,7 +86,7 @@ pub fn parse_emoji_shortcode(input: GrammarSpan) -> IResult<GrammarSpan, Node> {
         rest,
         Node {
             kind: NodeKind::Text(emoji.to_string()),
-            span: Some(to_parser_span(taken)),
+            span: opt_span(taken),
             children: Vec::new(),
         },
     ))

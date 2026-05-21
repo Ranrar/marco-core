@@ -1,60 +1,91 @@
 //! Embedded diagnostics catalog loaded from RON at compile time.
 //!
 //! Catalog sources live next to this module and are embedded via `include_str!`:
-//! - Marco-native catalog: `core/src/intelligence/diagnostics_catalog_marco.ron`
-//! - markdownlint baseline catalog: `core/src/intelligence/diagnostics_catalog_markdownlint.ron`
+//! - extension catalog file
+//! - markdownlint baseline catalog file},{
 
 use serde::Deserialize;
 use std::sync::LazyLock;
 
 #[derive(Debug, Clone, Deserialize, Default)]
+/// Root embedded diagnostics catalog model.
 pub struct DiagnosticsCatalog {
+    /// Catalog schema/content version.
     pub version: u32,
     #[serde(default)]
+    /// Runtime policy defaults.
     pub settings: DiagnosticsCatalogSettings,
     #[serde(default)]
+    /// Group metadata for diagnostics code ranges.
     pub groups: Vec<DiagnosticsCatalogGroup>,
     #[serde(default)]
+    /// Feature coverage metadata records.
     pub features: Vec<MarkdownFeatureCoverage>,
+    /// Diagnostic catalog entries.
     pub entries: Vec<DiagnosticsCatalogEntry>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
+/// Coverage metadata for a Markdown feature.
 pub struct MarkdownFeatureCoverage {
+    /// Stable feature key.
     pub key: String,
+    /// Human-readable feature title.
     pub title: String,
+    /// Feature category label.
     pub category: String,
+    /// Coverage status label.
     pub status: String,
     #[serde(default)]
+    /// Related AST node kind names.
     pub node_kinds: Vec<String>,
+    /// Optional showcase document path/id.
     pub showcase_doc: Option<String>,
     #[serde(default)]
+    /// Related diagnostic code ids.
     pub related_diagnostics: Vec<String>,
     #[serde(default)]
+    /// Free-form notes.
     pub notes: String,
     #[serde(default)]
+    /// Example snippets for this feature.
     pub examples: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
+/// Metadata group for a family of diagnostics.
 pub struct DiagnosticsCatalogGroup {
+    /// Stable group id.
     pub id: String,
+    /// Human-readable title.
     pub title: String,
+    /// Group description.
     pub description: String,
+    /// Code prefix matched by this group.
     pub code_prefix: String,
     #[serde(default)]
+    /// Free-form group tags.
     pub tags: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
+/// Shared diagnostics runtime settings loaded from catalog.
 pub struct DiagnosticsCatalogSettings {
+    /// Maximum heading length before warning.
     pub heading_too_long_threshold: usize,
+    /// URL schemes considered unsafe.
     pub unsafe_protocols: Vec<String>,
+    /// URL prefixes treated as insecure.
     pub insecure_link_prefixes: Vec<String>,
+    /// Marker substrings used to detect script tags.
     pub script_tag_markers: Vec<String>,
+    /// Fallback code id when unknown.
     pub unknown_code_fallback: String,
+    /// Fallback message when unknown.
     pub unknown_message_fallback: String,
+    /// Fallback fix suggestion when unknown.
     pub unknown_fix_suggestion_fallback: String,
+    /// Label used for unknown protocol values.
     pub unknown_protocol_label: String,
 }
 
@@ -74,18 +105,28 @@ impl Default for DiagnosticsCatalogSettings {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+/// A single diagnostics catalog entry.
 pub struct DiagnosticsCatalogEntry {
+    /// Stable enum-like key (for example `EmptyImageUrl`).
     pub key: String,
+    /// Stable external code id (for example `MD401`).
     pub code: String,
+    /// Human-readable short title.
     pub title: String,
     #[serde(default)]
+    /// Optional parameterized message template.
     pub message_template: Option<String>,
+    /// Default severity string (`Error`, `Warning`, `Info`, `Hint`).
     pub default_severity: String,
+    /// Suggested remediation text.
     pub fix_suggestion: String,
+    /// Rich explanation/description.
     pub description: String,
     #[serde(default)]
+    /// Free-form entry tags.
     pub tags: Vec<String>,
     #[serde(default)]
+    /// Example snippets associated with this diagnostic.
     pub examples: Vec<String>,
 }
 
@@ -111,7 +152,7 @@ fn merge_catalogs(
     mut marco: DiagnosticsCatalog,
     markdownlint: DiagnosticsCatalog,
 ) -> DiagnosticsCatalog {
-    // Keep Marco settings as authoritative for runtime policy.
+    // Keep extension-catalog settings as authoritative for runtime policy.
     marco.version = marco.version.max(markdownlint.version);
 
     for group in markdownlint.groups {
@@ -279,7 +320,7 @@ mod tests {
 
     #[test]
     fn smoke_test_group_lookup_prefers_longest_prefix_match() {
-        // MD101 should resolve to the Marco parse group (prefix MD1)
+        // MD101 should resolve to the parse group (prefix MD1)
         // instead of the broad markdownlint baseline group (prefix MD).
         let group = find_catalog_group_by_code("MD101").expect("expected group for MD101");
         assert_eq!(group.id, "parse");

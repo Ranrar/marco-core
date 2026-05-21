@@ -6,7 +6,7 @@
 //! We decode the entity here and emit it as `NodeKind::Text`, leaving the HTML
 //! renderer to escape it safely.
 
-use super::shared::{to_parser_span, GrammarSpan};
+use super::shared::{opt_span, GrammarSpan};
 use crate::parser::ast::{Node, NodeKind};
 use nom::IResult;
 use nom::Input;
@@ -64,7 +64,7 @@ pub fn parse_entity_reference(input: GrammarSpan) -> IResult<GrammarSpan, Node> 
 
     let node = Node {
         kind: NodeKind::Text(decoded),
-        span: Some(to_parser_span(entity_span)),
+        span: opt_span(entity_span),
         children: Vec::new(),
     };
 

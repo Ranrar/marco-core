@@ -2,7 +2,7 @@
 //!
 //! Syntax: `[^label]`
 
-use super::shared::{to_parser_span, GrammarSpan};
+use super::shared::{opt_span, GrammarSpan};
 use crate::parser::ast::{Node, NodeKind};
 use nom::IResult;
 use nom::Input;
@@ -61,7 +61,7 @@ pub fn parse_footnote_reference(input: GrammarSpan) -> IResult<GrammarSpan, Node
             kind: NodeKind::FootnoteReference {
                 label: label.to_string(),
             },
-            span: Some(to_parser_span(taken)),
+            span: opt_span(taken),
             children: Vec::new(),
         },
     ))
