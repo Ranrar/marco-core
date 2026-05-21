@@ -57,7 +57,7 @@ jobs:
             exit 1
           fi
 
-          published_versions="$(curl -fsSL "https://crates.io/api/v1/crates/${crate_name}/versions")"
+          published_versions="$(curl -fsSL -H "User-Agent: marco-core-ci/preflight (github.com/Ranrar/marco-core)" "https://crates.io/api/v1/crates/${crate_name}/versions")"
           if echo "$published_versions" | grep -q '"num":"'"$crate_version"'"'; then
             echo "::error title=Version already published::${crate_name} ${crate_version} already exists on crates.io."
             echo "Bump Cargo.toml version before releasing an update."
