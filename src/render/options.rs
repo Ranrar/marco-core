@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 /// Configuration options for HTML rendering.
 pub struct RenderOptions {
     /// Enable syntax highlighting for fenced code blocks when possible.
