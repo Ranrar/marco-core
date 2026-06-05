@@ -1067,9 +1067,10 @@ fn render_list_item(
     // beside the checkbox icon, not as a second row-sibling flex item.
     // Simple items (text only) skip the wrapper to keep the output minimal.
     let needs_wrapper = task_checked.is_some()
-        && node.children.iter().any(|c| {
-            !matches!(c.kind, NodeKind::TaskCheckbox { .. } | NodeKind::Paragraph)
-        });
+        && node
+            .children
+            .iter()
+            .any(|c| !matches!(c.kind, NodeKind::TaskCheckbox { .. } | NodeKind::Paragraph));
 
     if tight {
         // Tight list: paragraph content is inlined (no <p> wrapper), so we can

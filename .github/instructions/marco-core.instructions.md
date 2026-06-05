@@ -3,7 +3,7 @@ description: 'Rust instructions for marco-core (pure-Rust Markdown library)'
 applyTo: '**/*.rs'
 ---
 
-Apply Rust library development expertise to `marco-core`, a **pure-Rust library** crate (v1.1.0) published to crates.io — a nom-based Markdown parser, HTML renderer, and editor-intelligence layer (highlights, diagnostics, completions, hover).
+Apply Rust library development expertise to `marco-core`, a **pure-Rust library** crate (v1.1.1) published to crates.io — a nom-based Markdown parser, HTML renderer, and editor-intelligence layer (highlights, diagnostics, completions, hover).
 
 ## Crate constraints
 
