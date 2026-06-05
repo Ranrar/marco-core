@@ -1062,11 +1062,23 @@ fn render_list_item(
         output.push_str("<li>");
     }
 
+    // A task-list item with nested block elements (e.g. a sub-list) needs a
+    // content wrapper <div> so those blocks flow in a single flex column
+    // beside the checkbox icon, not as a second row-sibling flex item.
+    // Simple items (text only) skip the wrapper to keep the output minimal.
+    let needs_wrapper = task_checked.is_some()
+        && node.children.iter().any(|c| {
+            !matches!(c.kind, NodeKind::TaskCheckbox { .. } | NodeKind::Paragraph)
+        });
+
     if tight {
         // Tight list: paragraph content is inlined (no <p> wrapper), so we can
         // safely emit the checkbox icon at the start of the list item.
         if let Some(checked) = task_checked {
             render_task_checkbox_icon(output, checked);
+        }
+        if needs_wrapper {
+            output.push_str("<div class=\"marco-task-content\">");
         }
 
         // Tight list: don't wrap paragraphs in <p> tags
@@ -1087,18 +1099,31 @@ fn render_list_item(
                 }
             }
         }
+
+        if needs_wrapper {
+            output.push_str("</div>");
+        }
     } else {
         // Loose list: keep paragraphs wrapped in <p>, but for task list items we
         // want the checkbox icon to sit inline with the first paragraph's text.
         let mut checkbox_emitted = false;
+
+        if needs_wrapper {
+            // Emit checkbox before the wrapper so it stays as its own flex item.
+            if let Some(checked) = task_checked {
+                render_task_checkbox_icon(output, checked);
+                checkbox_emitted = true;
+            }
+            output.push_str("<div class=\"marco-task-content\">");
+        }
 
         for child in &node.children {
             if matches!(child.kind, NodeKind::TaskCheckbox { .. }) {
                 continue;
             }
 
-            // Emit the checkbox exactly once, either inside the first paragraph
-            // or as a standalone prefix if the first block isn't a paragraph.
+            // Emit the checkbox exactly once (when not already done above),
+            // either inside the first paragraph or as a standalone prefix.
             if let Some(checked) = task_checked {
                 if !checkbox_emitted {
                     match &child.kind {
@@ -1122,6 +1147,10 @@ fn render_list_item(
             }
 
             render_node(child, output, options, ctx)?;
+        }
+
+        if needs_wrapper {
+            output.push_str("</div>");
         }
     }
 

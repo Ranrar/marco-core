@@ -389,6 +389,14 @@ li + li { margin-top: 0.15rem; }
     accent-color: var(--mc-task-primary, var(--link-color, #0066cc));
 }
 
+/* Content column beside the checkbox icon: grows to fill available width and
+   allows text to wrap. Ensures nested blocks (lists, blockquotes, …) flow
+   below the label rather than appearing as a second flex row-item. */
+.marco-task-content {
+    flex: 1;
+    min-width: 0;
+}
+
 /* ── Definition lists ─────────────────────────────────────────────────────── */
 dl { margin: 1rem 0; }
 

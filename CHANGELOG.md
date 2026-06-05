@@ -5,6 +5,22 @@ This project follows **Semantic Versioning** and uses the **Keep a Changelog** f
 
 Version scheme note: `marco-core` and `marco-shared` follow independent semver from the application binaries (marco/polo). The library tracks API stability for crates.io consumers; breaking API changes increment the major version.
 
+## [1.1.1] - 2026-06-05
+
+### Fixed
+
+#### Task list items with nested blocks render correctly
+
+Task list items that contain nested block elements (e.g. a sub-list of bullet
+points) were rendered incorrectly: the nested `<ul>` appeared as a second
+flex row-sibling of the checkbox icon instead of flowing below the label text.
+
+The renderer now wraps the content of such items in
+`<div class="marco-task-content">`, and the base stylesheet gives that element
+`flex: 1; min-width: 0` so all nested blocks flow in a single column beside
+the checkbox. Simple items (text only) are unaffected — no wrapper is emitted
+when there are no nested block children.
+
 ## [1.1.0] - 2026-05-08
 
 ### Removed
