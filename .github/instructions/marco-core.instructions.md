@@ -3,7 +3,7 @@ description: 'Rust instructions for marco-core (pure-Rust Markdown library)'
 applyTo: '**/*.rs'
 ---
 
-Apply Rust library development expertise to `marco-core`, a **pure-Rust library** crate (v1.1.1) published to crates.io — a nom-based Markdown parser, HTML renderer, and editor-intelligence layer (highlights, diagnostics, completions, hover).
+Apply Rust library development expertise to `marco-core`, a **pure-Rust library** crate (v1.2.0) published to crates.io — a nom-based Markdown parser, HTML renderer, and editor-intelligence layer (highlights, diagnostics, completions, hover).
 
 ## Crate constraints
 
@@ -31,6 +31,7 @@ src/
     markdown.rs                   — main HTML renderer
     options.rs                    — RenderOptions
     base_css.rs                   — bundled CSS (marco-* / mc-* class namespace)
+    theme_meta.rs                 — parses --theme-* metadata tokens from theme CSS
     syntect_highlighter.rs        — syntax highlighting via syntect
     diagram.rs / math.rs          — Mermaid and KaTeX support
     preview_document.rs           — full HTML document wrapper
@@ -65,6 +66,7 @@ src/
    cargo test --locked
    ```
 5. **Document user-visible changes** in `CHANGELOG.md` under `[Unreleased]` (Keep a Changelog format).
+6. **On version bump, re-check `README.md`**: the `marco-core = "x.y"` dependency pins (usage + feature-flags snippets), the test-count line under `## Features` (run `cargo test` and recount unit/integration/doctest), and this file's own `v_._._` version in the opening line. These are hardcoded numbers, not generated — they silently rot if skipped.
 
 ## Coding rules
 
