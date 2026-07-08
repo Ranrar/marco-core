@@ -24,6 +24,8 @@ pub mod preview_document;
 /// Syntax highlighting support based on syntect.
 #[cfg(feature = "render-syntax-highlighting")]
 pub mod syntect_highlighter;
+/// Theme metadata: parses `--theme-*` descriptive tokens from theme CSS.
+pub mod theme_meta;
 
 /// Re-export code language helpers.
 pub use code_languages::*;
@@ -36,6 +38,8 @@ pub use preview_document::*;
 /// Re-export syntax highlighter helpers.
 #[cfg(feature = "render-syntax-highlighting")]
 pub use syntect_highlighter::*;
+/// Re-export theme metadata helpers.
+pub use theme_meta::*;
 
 use crate::parser::Document;
 

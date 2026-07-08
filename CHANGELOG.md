@@ -5,6 +5,20 @@ This project follows **Semantic Versioning** and uses the **Keep a Changelog** f
 
 Version scheme note: `marco-core` and `marco-shared` follow independent semver from the application binaries (marco/polo). The library tracks API stability for crates.io consumers; breaking API changes increment the major version.
 
+## [1.2.0] - 2026-07-08
+
+### Added
+
+#### Theme metadata parsing
+
+Theme token CSS files can now declare descriptive `--theme-*` custom
+properties (`--theme-name`, `--theme-author`, `--theme-license`,
+`--theme-version`, `--theme-description`) alongside their colour/font
+tokens. The new `render::theme_meta::parse_theme_metadata` function reads
+these back out of a theme's raw CSS into a `ThemeMetadata` struct, so
+consumers (e.g. a theme picker UI) can display attribution and version
+info without deriving it from the filename.
+
 ## [1.1.1] - 2026-06-05
 
 ### Fixed

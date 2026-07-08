@@ -6,6 +6,10 @@
 ///
 /// Theme files (`.css` in `assets/themes/html_viever/`) provide ONLY
 /// CSS custom property declarations (`--var: value`) — no structural rules.
+/// This may include descriptive `--theme-*` metadata tokens (name,
+/// author, license, version, description) alongside the colour/font ones —
+/// see [`theme_meta::parse_theme_metadata`](super::theme_meta::parse_theme_metadata)
+/// for how consumers read them back out.
 ///
 /// Injection order in the final `<style>` block:
 ///   1. `inline_bg_style` — instant background colour flash-prevention
@@ -268,7 +272,7 @@ pre code {
 .nested-code-block .code-content p:last-child  { margin-bottom: 0; }
 
 /* ── Code copy button ─────────────────────────────────────────────────────── */
-.0 {
+.marco-code-block {
     position: relative;
     margin: 1rem 0;
 }
@@ -291,7 +295,7 @@ pre code {
     z-index: 10;
 }
 
-.0:hover .marco-copy-btn {
+.marco-code-block:hover .marco-copy-btn {
     opacity: 1;
 }
 
