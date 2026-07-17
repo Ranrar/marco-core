@@ -13,7 +13,15 @@ pub fn image(input: Span) -> IResult<Span, (Span, Span, Option<Span>)> {
             nom::error::ErrorKind::Tag,
         )));
     }
-    let bracket_pos = content_str[2..].find(']').ok_or_else(|| {
+    // Consult the precomputed cache first (see `bracket_match` module docs)
+    // — falls back to a live scan when no cache is installed (e.g. calling
+    // this function directly, as the unit test below does).
+    let bang_abs = input.location_offset();
+    let bracket_pos = match super::bracket_match::cached_image_flat_match(bang_abs) {
+        Some(cached) => cached.map(|close_abs| close_abs - bang_abs - 2),
+        None => content_str[2..].find(']'),
+    }
+    .ok_or_else(|| {
         nom::Err::Error(nom::error::Error::new(
             input,
             nom::error::ErrorKind::TakeUntil,

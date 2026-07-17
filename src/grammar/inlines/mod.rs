@@ -11,6 +11,10 @@ pub use nom_locate::LocatedSpan;
 /// Inline grammar span type preserving location information.
 pub type Span<'a> = LocatedSpan<&'a str>;
 
+/// Precomputed `[`/`]` bracket matching shared by link/image/reference-link
+/// grammar (see module docs for why this exists).
+pub mod bracket_match;
+
 // Individual inline grammar modules
 pub mod cm_autolink;
 pub mod cm_backslash_escape;

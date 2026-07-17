@@ -12,9 +12,26 @@ fn find_matching_closing_bracket(
     s: &str,
     open_bracket_idx: usize,
     allow_nested_brackets: bool,
+    abs_base_offset: usize,
 ) -> Option<usize> {
     if s.as_bytes().get(open_bracket_idx) != Some(&b'[') {
         return None;
+    }
+
+    // Consult the precomputed cache first (see `bracket_match` module docs
+    // in the grammar layer) — only the nested-brackets-allowed mode is
+    // cached, since that's the one retried at every subsequent `[` position
+    // in the pathological case; the "label" scan (nested disallowed) below
+    // is only ever attempted once per successful text-bracket match, so it
+    // was never part of the O(n^2) blowup and doesn't need caching. Falls
+    // back to the live scan when no cache is installed.
+    if allow_nested_brackets {
+        let abs_open = abs_base_offset + open_bracket_idx;
+        if let Some(cached) =
+            crate::grammar::inlines::bracket_match::cached_escape_aware_nested_match(abs_open)
+        {
+            return cached.map(|abs_close| abs_close - abs_base_offset);
+        }
     }
 
     let mut depth = 1usize;
@@ -107,8 +124,9 @@ pub fn parse_reference_link(input: GrammarSpan) -> IResult<GrammarSpan, Node> {
 
     // Find closing bracket for first link text, allowing nested brackets and
     // treating escaped brackets as literal text.
+    let abs_base_offset = start_input.location_offset();
     let absolute_bracket_pos =
-        find_matching_closing_bracket(content_str, 0, true).ok_or_else(|| {
+        find_matching_closing_bracket(content_str, 0, true, abs_base_offset).ok_or_else(|| {
             nom::Err::Error(nom::error::Error::new(
                 input,
                 nom::error::ErrorKind::TakeUntil,
@@ -151,15 +169,6 @@ pub fn parse_reference_link(input: GrammarSpan) -> IResult<GrammarSpan, Node> {
         )));
     }
 
-    // Parse the displayed link text as inlines.
-    let children = match crate::parser::inlines::parse_inlines_from_span(link_text) {
-        Ok(children) => children,
-        Err(e) => {
-            log::warn!("Failed to parse reference link text children: {}", e);
-            vec![]
-        }
-    };
-
     let mut label = link_text_str.to_string();
     let mut suffix = String::new();
     let mut consumed_len = after_first_bracket;
@@ -184,8 +193,9 @@ pub fn parse_reference_link(input: GrammarSpan) -> IResult<GrammarSpan, Node> {
             consumed_len = after_first_bracket + 2;
         } else {
             // Full reference link: `[label]`
-            let close2_abs = find_matching_closing_bracket(content_str, after_first_bracket, false)
-                .ok_or_else(|| {
+            let close2_abs =
+                find_matching_closing_bracket(content_str, after_first_bracket, false, abs_base_offset)
+                    .ok_or_else(|| {
                     nom::Err::Error(nom::error::Error::new(
                         input,
                         nom::error::ErrorKind::TakeUntil,
@@ -211,6 +221,25 @@ pub fn parse_reference_link(input: GrammarSpan) -> IResult<GrammarSpan, Node> {
             nom::error::ErrorKind::Verify,
         )));
     }
+
+    // Parse the displayed link text as inlines. Deferred until every cheap
+    // validity check above has passed: this recursive parse is by far the
+    // most expensive part of this function, and for adversarial nested
+    // brackets (e.g. `tools/perf-lab/fixtures/pathological/unbalanced-brackets.md`)
+    // most bracket pairs found above resolve to *invalid* reference links —
+    // doing this eagerly before validation meant re-parsing the same
+    // overlapping "link text" recursively once per nested opener, which is
+    // exponential in nesting depth. Only fully-validated matches pay this
+    // cost now, matching how the inline-link parser already behaves
+    // (`grammar::link` validates the whole `[text](url)` shape before
+    // `parse_link` recurses into the text).
+    let children = match crate::parser::inlines::parse_inlines_from_span(link_text) {
+        Ok(children) => children,
+        Err(e) => {
+            log::warn!("Failed to parse reference link text children: {}", e);
+            vec![]
+        }
+    };
 
     let span = opt_span(link_text);
     let rest = start_input.take_from(consumed_len);
