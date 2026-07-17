@@ -40,6 +40,17 @@ struct RenderContext<'a> {
     /// Tracks how many times each slug base has been used so duplicates get
     /// a `-1`, `-2`, … suffix — matching the same logic in `intelligence::toc`.
     heading_slug_counts: HashMap<String, usize>,
+    /// Syntax-highlight results computed up front (see `precompute_highlights`),
+    /// keyed by the `CodeBlock` node's own address — stable for the
+    /// lifetime of one `render_html` call since `document` is never mutated
+    /// in between, and immune to traversal-order concerns (footnote
+    /// definitions render in a different order than they appear in the
+    /// tree). `None` means no precomputed cache is installed — the
+    /// `parallel-render` feature is disabled — and `render_node` falls back
+    /// to computing highlights synchronously, unchanged from before this
+    /// cache existed.
+    #[cfg(feature = "render-syntax-highlighting")]
+    precomputed_highlights: Option<HashMap<usize, String>>,
 }
 
 /// Render a parsed Markdown document into HTML.
@@ -57,6 +68,11 @@ pub fn render_html(
     let mut ctx = RenderContext::default();
     for node in &document.children {
         collect_footnote_definitions(node, &mut ctx.footnote_defs);
+    }
+
+    #[cfg(all(feature = "render-syntax-highlighting", feature = "parallel-render"))]
+    {
+        ctx.precomputed_highlights = Some(precompute_highlights(document, options));
     }
 
     for node in &document.children {
@@ -106,6 +122,51 @@ fn collect_footnote_definitions<'a>(node: &'a Node, defs: &mut HashMap<String, &
     for child in &node.children {
         collect_footnote_definitions(child, defs);
     }
+}
+
+/// Fan out per-`CodeBlock` syntax highlighting across cores with rayon,
+/// computing every eligible block's result up front. Highlighting is a
+/// pure function of `(code, lang)` with no shared mutable state between
+/// blocks, so this is safe.
+///
+/// Results are keyed by each `CodeBlock` node's own address rather than by
+/// traversal position: footnote definitions render in a different order
+/// (deferred to the end, in first-reference order — see `render_html`)
+/// than they appear in the tree, so a position/index-based cache would
+/// require this collection pass to exactly replicate that reordering to
+/// stay in sync. Node addresses sidestep that entirely — every node here
+/// and in `render_node` refers to the same never-mutated `document`, so an
+/// address collected here is guaranteed to match the same node seen later,
+/// regardless of which order either pass visits things in.
+#[cfg(all(feature = "render-syntax-highlighting", feature = "parallel-render"))]
+fn precompute_highlights(document: &Document, options: &RenderOptions) -> HashMap<usize, String> {
+    use rayon::prelude::*;
+
+    fn collect<'a>(node: &'a Node, options: &RenderOptions, targets: &mut Vec<(usize, &'a str, &'a str)>) {
+        if let NodeKind::CodeBlock { language, code } = &node.kind {
+            if options.syntax_highlighting {
+                let language_raw = language.as_deref().map(str::trim).filter(|s| !s.is_empty());
+                if let Some(lang) = language_raw {
+                    targets.push((std::ptr::from_ref(node) as usize, code.as_str(), lang));
+                }
+            }
+        }
+        for child in &node.children {
+            collect(child, options, targets);
+        }
+    }
+
+    let mut targets = Vec::new();
+    for node in &document.children {
+        collect(node, options, &mut targets);
+    }
+
+    targets
+        .par_iter()
+        .filter_map(|(key, code, lang)| {
+            highlight_code_to_classed_html(code, lang).map(|html| (*key, html))
+        })
+        .collect()
 }
 
 // Render individual node
@@ -196,11 +257,19 @@ fn render_node(
             output.push('>');
 
             // Optional syntax highlighting. If syntect can't resolve the language,
-            // fall back to plain escaped code.
+            // fall back to plain escaped code. When the `parallel-render`
+            // cache is installed (see `precompute_highlights`), use its
+            // precomputed result instead of highlighting synchronously here
+            // — falls back to the original direct call when no cache is
+            // installed (feature disabled), unchanged from before.
             #[cfg(feature = "render-syntax-highlighting")]
             if options.syntax_highlighting {
                 if let Some(lang) = language_raw {
-                    if let Some(highlighted) = highlight_code_to_classed_html(code, lang) {
+                    let highlighted = match ctx.precomputed_highlights.as_ref() {
+                        Some(cache) => cache.get(&(std::ptr::from_ref(node) as usize)).cloned(),
+                        None => highlight_code_to_classed_html(code, lang),
+                    };
+                    if let Some(highlighted) = highlighted {
                         output.push_str(&highlighted);
                         output.push_str("</code></pre>");
                         output.push_str("</div>\n");
