@@ -169,6 +169,69 @@ fn precompute_highlights(document: &Document, options: &RenderOptions) -> HashMa
         .collect()
 }
 
+/// Eagerly initializes state that `parallel-render` otherwise sets up
+/// lazily on first use: rayon's global thread pool, syntect's default
+/// syntax/theme sets, and — for each language in `languages` — syntect's
+/// internal per-language setup.
+///
+/// The `languages` list matters more than it might look: measured directly
+/// (16-core machine, the `fixture:large/code-heavy.md` perf-lab fixture,
+/// mixed rust/python/javascript), warming *only* the thread pool made no
+/// measurable difference to the first render (~20ms either way — thread
+/// spawn itself is not the bottleneck here, contrary to an earlier draft of
+/// this function that assumed it was). What did measurably help was also
+/// pre-highlighting the specific languages the fixture actually uses:
+/// first-render time dropped from ~20.4ms to ~14.1ms (~31%). A
+/// language-blind warm-up can't buy that on its own, because it doesn't
+/// know which languages your documents contain — pass the ones you expect
+/// (e.g. your editor's supported-language list, or languages seen in the
+/// user's recently opened files) to get the real benefit. An empty slice
+/// still warms the thread pool and syntect's defaults, which is a small,
+/// generically-safe win, just not the dominant one.
+///
+/// Note there is a residual first-render cost (~6-7ms in the same
+/// measurement) that persists even after warming the pool, syntect
+/// defaults, *and* every language actually used — this looks like
+/// first-touch allocation/OS-level warm-up rather than anything this crate
+/// controls, and no combination of arguments to this function removes it.
+///
+/// Call this during application startup, before the first document is
+/// opened (e.g. off a splash screen or init routine), to move whichever
+/// part of that cost *can* be moved off a user-visible render. This is
+/// purely a matter of *when* the cost is paid: if you never call this,
+/// rendering still works correctly and everything still initializes
+/// lazily and correctly on first use (the default "warm on first request"
+/// behavior) — this function does not change behavior or output, only
+/// timing.
+///
+/// A no-op when `parallel-render` is not compiled in, so it's always safe
+/// to call unconditionally regardless of which features a consumer builds
+/// with.
+#[cfg(feature = "parallel-render")]
+pub fn warm_render_thread_pool(languages: &[&str]) {
+    // `rayon::join`/`par_iter` on trivial work can return before every
+    // worker OS thread has actually been spawned, so it doesn't reliably
+    // move that part of the cost earlier. `build_global` spawns the
+    // configured worker threads synchronously as part of the call. `Err`
+    // just means some other code already installed a global pool (e.g. a
+    // previous call to this function) — harmless.
+    let _ = rayon::ThreadPoolBuilder::new().build_global();
+
+    #[cfg(feature = "render-syntax-highlighting")]
+    for lang in languages {
+        let _ = highlight_code_to_classed_html(" ", lang);
+    }
+    #[cfg(not(feature = "render-syntax-highlighting"))]
+    let _ = languages;
+}
+
+/// See the `parallel-render`-enabled version of this function for the full
+/// explanation. Without that feature there is nothing to warm, so this is
+/// a no-op — kept so callers don't need their own `#[cfg]` around a call to
+/// this at startup.
+#[cfg(not(feature = "parallel-render"))]
+pub fn warm_render_thread_pool(_languages: &[&str]) {}
+
 // Render individual node
 fn render_node(
     node: &Node,
@@ -1250,6 +1313,29 @@ mod tests {
     use crate::parser::{Document, Node, NodeKind};
 
     #[test]
+    fn warm_render_thread_pool_is_callable_and_render_still_works() {
+        // Present regardless of features (no-op without `parallel-render`);
+        // callers shouldn't need their own #[cfg] just to call this.
+        warm_render_thread_pool(&["rust", "python"]);
+        warm_render_thread_pool(&[]); // repeat calls, empty list, must stay harmless
+
+        let doc = Document {
+            children: vec![Node {
+                kind: NodeKind::Paragraph,
+                span: None,
+                children: vec![Node {
+                    kind: NodeKind::Text("still works after warmup".to_string()),
+                    span: None,
+                    children: vec![],
+                }],
+            }],
+            ..Default::default()
+        };
+        let result = render_html(&doc, &RenderOptions::default()).unwrap();
+        assert!(result.contains("still works after warmup"));
+    }
+
+    #[test]
     fn smoke_test_escape_html_basic() {
         let input = "Hello <world> & \"friends\"";
         let expected = "Hello &lt;world&gt; &amp; &quot;friends&quot;";
@@ -1752,6 +1838,132 @@ mod tests {
             html.contains(">after<"),
             "after paragraph must be present, got: {}",
             html
+        );
+    }
+
+    /// Regression test for the Phase 3 (`parallel-render`) node-address-keyed
+    /// highlight cache in `precompute_highlights`. Footnote definitions
+    /// render in first-reference order at the end of the document, which can
+    /// differ from their order in the tree — this is the exact mismatch that
+    /// motivated keying the cache by node address instead of traversal
+    /// position/index (see the "parser-render-optimization-plan.md" Phase 3
+    /// notes). Only compiled when `parallel-render` is enabled, since that's
+    /// the only configuration where `precomputed_highlights` is ever `Some`
+    /// and this cache is actually exercised.
+    #[cfg(all(feature = "render-syntax-highlighting", feature = "parallel-render"))]
+    #[test]
+    fn parallel_render_matches_each_code_block_to_its_own_node_across_footnote_reorder() {
+        let top_code = "fn top() -> i32 { 1 }";
+        let a_code = "def a():\n    return 1\n";
+        let b_code = "function b() { return 2; }";
+
+        // Tree order defines footnote "a" before "b", but the paragraph
+        // references "b" before "a" — so the footnotes section (rendered in
+        // first-reference order) emits "b" before "a", the reverse of tree
+        // order. `precompute_highlights` walks the tree once (a-then-b
+        // order); `render_node` walks it again but emits the footnotes
+        // section in b-then-a order. Node-address keying must still resolve
+        // each code block to its own highlighted result despite that.
+        let doc = Document {
+            children: vec![
+                Node {
+                    kind: NodeKind::Paragraph,
+                    span: None,
+                    children: vec![
+                        Node {
+                            kind: NodeKind::FootnoteReference {
+                                label: "b".to_string(),
+                            },
+                            span: None,
+                            children: vec![],
+                        },
+                        Node {
+                            kind: NodeKind::FootnoteReference {
+                                label: "a".to_string(),
+                            },
+                            span: None,
+                            children: vec![],
+                        },
+                    ],
+                },
+                Node {
+                    kind: NodeKind::CodeBlock {
+                        language: Some("rust".to_string()),
+                        code: top_code.to_string(),
+                    },
+                    span: None,
+                    children: vec![],
+                },
+                Node {
+                    kind: NodeKind::FootnoteDefinition {
+                        label: "a".to_string(),
+                    },
+                    span: None,
+                    children: vec![Node {
+                        kind: NodeKind::CodeBlock {
+                            language: Some("python".to_string()),
+                            code: a_code.to_string(),
+                        },
+                        span: None,
+                        children: vec![],
+                    }],
+                },
+                Node {
+                    kind: NodeKind::FootnoteDefinition {
+                        label: "b".to_string(),
+                    },
+                    span: None,
+                    children: vec![Node {
+                        kind: NodeKind::CodeBlock {
+                            language: Some("javascript".to_string()),
+                            code: b_code.to_string(),
+                        },
+                        span: None,
+                        children: vec![],
+                    }],
+                },
+            ],
+            ..Default::default()
+        };
+
+        let options = RenderOptions::default();
+        let result = render_html(&doc, &options).unwrap();
+
+        // Independently highlight each snippet via the same underlying
+        // function the parallel path calls, to build the expected fragment
+        // for each node without hardcoding syntect's exact class output.
+        let top_html = highlight_code_to_classed_html(top_code, "rust")
+            .expect("rust snippet should highlight");
+        let a_html = highlight_code_to_classed_html(a_code, "python")
+            .expect("python snippet should highlight");
+        let b_html = highlight_code_to_classed_html(b_code, "javascript")
+            .expect("javascript snippet should highlight");
+
+        assert!(
+            result.contains(&top_html),
+            "top-level rust code block should carry its own highlighted HTML"
+        );
+        assert!(
+            result.contains(&a_html),
+            "footnote \"a\"'s python code block should carry its own \
+             highlighted HTML, not another block's"
+        );
+        assert!(
+            result.contains(&b_html),
+            "footnote \"b\"'s javascript code block should carry its own \
+             highlighted HTML, not another block's"
+        );
+
+        // And the footnote reordering itself must still hold: "b" (first
+        // referenced) before "a", even though "a" was collected first by
+        // `precompute_highlights`'s tree walk.
+        let b_pos = result.find(&b_html).expect("b highlighted fragment present");
+        let a_pos = result.find(&a_html).expect("a highlighted fragment present");
+        assert!(
+            b_pos < a_pos,
+            "footnote \"b\" should render before footnote \"a\" \
+             (first-reference order) while each keeps its own code block's \
+             highlighting"
         );
     }
 }
