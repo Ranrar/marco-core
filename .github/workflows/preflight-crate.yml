@@ -1,4 +1,4 @@
-name: Crates.io publish preflight
+name: Publish marco-core preflight
 
 on:
   push:

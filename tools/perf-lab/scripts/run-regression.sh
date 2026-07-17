@@ -10,9 +10,21 @@
 #   --warn PCT          Warn threshold % (default: 10)
 #   --fail PCT          Fail threshold % (default: 20)
 #   --min-failures N    Min regressions to hard-fail (default: 2)
-#   --critical-only     Gate only on critical workloads
+#   --critical-only     Gate only on critical workloads (spec:commonmark,
+#                        fixture:pathological:*, plus anything tagged
+#                        "critical" in its id/profile)
+#   --mode MODE         Only compare records in this mode
+#                        (parse|render|e2e|intelligence); default compares
+#                        every mode present in both files
 #   --release           Build in release mode
 #   -h, --help          Show this help
+#
+# Note: `--baseline`/`--current` must both cover the same mode(s) — matching
+# is exact on (engine, workload_id, mode), so a baseline missing a mode the
+# current run has (or vice versa) silently skips those records rather than
+# comparing them. If you benchmarked in more than one mode, merge the JSON
+# arrays first (e.g. `jq -s add e2e.json parse.json > merged.json`) — this is
+# what ci-perf.yml does before calling this same regression check.
 #
 # Quick start (run a fresh bench first, then compare to stored baseline):
 #   ./scripts/run-bench.sh --release --mode e2e --iterations 30
@@ -20,6 +32,13 @@
 #   ./scripts/run-regression.sh \
 #     --baseline tools/perf-lab/output/baseline/bench-baseline.json \
 #     --current "$LATEST"
+#
+# Reproduce the CI critical-workload gate locally (parse mode only, fails on
+# a single regressed spec:commonmark/fixture:pathological:* workload):
+#   ./scripts/run-regression.sh \
+#     --baseline tools/perf-lab/output/baseline/bench-baseline.json \
+#     --current "$LATEST" \
+#     --critical-only --mode parse --min-failures 1
 #
 # Capture a new baseline:
 #   cp "$LATEST" tools/perf-lab/output/baseline/bench-baseline.json
@@ -35,6 +54,7 @@ WARN="10"
 FAIL_T="20"
 MIN_FAILURES="2"
 CRITICAL_ONLY=""
+MODE=""
 RELEASE_FLAG=""
 PROFILE="debug"
 
@@ -46,6 +66,7 @@ while [[ $# -gt 0 ]]; do
     --fail)         FAIL_T="$2";      shift 2 ;;
     --min-failures) MIN_FAILURES="$2"; shift 2 ;;
     --critical-only) CRITICAL_ONLY="--critical-only"; shift ;;
+    --mode)         MODE="$2";        shift 2 ;;
     --release)      RELEASE_FLAG="--release"; PROFILE="release"; shift ;;
     -h|--help)
       grep '^#' "$0" | sed 's/^# \?//'
@@ -61,6 +82,9 @@ if [[ -z "$BASELINE" || -z "$CURRENT" ]]; then
   exit 1
 fi
 
+MODE_FLAG=""
+[[ -n "$MODE" ]] && MODE_FLAG="--mode $MODE"
+
 cargo build --manifest-path tools/perf-lab/Cargo.toml $RELEASE_FLAG 2>&1 | tail -2
 
 "tools/perf-lab/target/${PROFILE}/perf-lab" regression \
@@ -69,4 +93,5 @@ cargo build --manifest-path tools/perf-lab/Cargo.toml $RELEASE_FLAG 2>&1 | tail 
   --warn-threshold "$WARN" \
   --fail-threshold "$FAIL_T" \
   --min-failures   "$MIN_FAILURES" \
-  $CRITICAL_ONLY
+  $CRITICAL_ONLY \
+  $MODE_FLAG

@@ -52,6 +52,13 @@ render-diagrams            = ["dep:mermaid-rs-renderer"]
 # `render-syntax-highlighting` is also enabled.
 parallel-render = ["dep:rayon"]
 
+# Parallel parsing: fan out inline parsing of independent block content
+# (paragraphs, table cells, definition terms, footnote-definition bodies)
+# across cores with rayon, after block boundaries are found sequentially.
+# Off by default, same reasoning as `parallel-render`. Independent of that
+# feature — either alone pulls in `dep:rayon`.
+parallel-parse = ["dep:rayon"]
+
 # Runtime utilities
 file-logger = []
 

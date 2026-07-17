@@ -6,6 +6,26 @@
 # The baseline artifact used for gating is the most recent artifact uploaded
 # by Stage A from the main branch.  When no baseline artifact is found (first
 # run, or after the artifact TTL expires) Stage B skips the gate gracefully.
+#
+# Both stages benchmark in *both* `--mode e2e` and `--mode parse`, then merge
+# the two runs' JSON into one artifact with `jq -s add` before uploading or
+# comparing. This matters: `perf-lab regression` matches records by
+# (engine, workload_id, mode) exactly, so a baseline containing only one mode
+# would silently fail to match a current run in a different mode — every
+# record would be skipped as "no baseline record" and the gate would report
+# 0 fail / 0 warn regardless of actual regressions. Merging keeps both modes
+# on both sides of every comparison.
+#
+# Two regression gates run in Stage B:
+#   - the broad gate: fails if 2+ workloads (any of them, any mode) regress
+#     past PERF_FAIL_THRESHOLD.
+#   - the critical-workload gate: fails if `spec:commonmark` or any
+#     `fixture:pathological:*` workload regresses past PERF_FAIL_THRESHOLD in
+#     *parse* mode, on its own — no second regression needed. These are the
+#     workloads `.dev/parser-render-optimization-plan.md` brought down from
+#     ~70-212x slower than comparable engines; that plan's Phase 5 goal is
+#     that regressing either back toward that territory fails a PR by
+#     itself.
 
 name: CI (Performance)
 
@@ -19,15 +39,18 @@ env:
   # Thresholds (%) used by `perf-lab regression`
   PERF_WARN_THRESHOLD: "10"
   PERF_FAIL_THRESHOLD: "20"
-  # Minimum regressions to trigger a hard failure
+  # Minimum regressions to trigger a hard failure (broad gate, any workload)
   PERF_MIN_FAILURES: "2"
+  # The critical-workload gate fails on a single regression in
+  # spec:commonmark / fixture:pathological:* — see header comment above.
+  PERF_CRITICAL_MIN_FAILURES: "1"
 
 jobs:
   # ────────────────────────────────────────────────────────────────────────────
   # Stage A — collect + archive artifacts (non-blocking, main branch only)
   # ────────────────────────────────────────────────────────────────────────────
   bench-stage-a:
-    name: "Perf: Stage A – collect artifacts"
+    name: "Perf: Stage A - collect artifacts"
     runs-on: ubuntu-24.04
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
@@ -64,6 +87,20 @@ jobs:
             --iterations 30 \
             2>&1
 
+      - name: Capture e2e summary artifact
+        run: |
+          # Grabbed immediately after the e2e run, before the parse run
+          # below creates a newer file — see header comment on why each
+          # mode's output must be captured separately, not just "the latest".
+          LATEST=$(ls -1t tools/perf-lab/output/summary/bench-*.json 2>/dev/null | head -1)
+          if [[ -z "$LATEST" ]]; then
+            echo "ERROR: no e2e bench artifact produced" >&2
+            exit 1
+          fi
+          mkdir -p ci-artifacts
+          cp "$LATEST" ci-artifacts/bench-main-e2e.json
+          echo "e2e artifact: $LATEST"
+
       - name: Run benchmark (parse mode, marco-core)
         run: |
           tools/perf-lab/target/release/perf-lab bench \
@@ -72,17 +109,22 @@ jobs:
             --iterations 30 \
             2>&1
 
-      - name: Collect latest summary artifact
+      - name: Capture parse summary artifact
         run: |
-          # Find the most recent bench artifact in summary dir
           LATEST=$(ls -1t tools/perf-lab/output/summary/bench-*.json 2>/dev/null | head -1)
           if [[ -z "$LATEST" ]]; then
-            echo "No bench artifact found — skipping upload"
-            exit 0
+            echo "ERROR: no parse bench artifact produced" >&2
+            exit 1
           fi
           mkdir -p ci-artifacts
-          cp "$LATEST" ci-artifacts/bench-main-latest.json
-          echo "Uploading: $LATEST"
+          cp "$LATEST" ci-artifacts/bench-main-parse.json
+          echo "parse artifact: $LATEST"
+
+      - name: Merge e2e + parse artifacts
+        run: |
+          jq -s 'add' ci-artifacts/bench-main-e2e.json ci-artifacts/bench-main-parse.json \
+            > ci-artifacts/bench-main-latest.json
+          echo "Merged $(jq 'length' ci-artifacts/bench-main-e2e.json) e2e + $(jq 'length' ci-artifacts/bench-main-parse.json) parse record(s) into $(jq 'length' ci-artifacts/bench-main-latest.json) total"
 
       - name: Upload benchmark artifact
         uses: actions/upload-artifact@v4
@@ -132,16 +174,41 @@ jobs:
             --iterations 20 \
             2>&1
 
-      - name: Collect PR benchmark artifact
+      - name: Capture PR e2e artifact
         run: |
           LATEST=$(ls -1t tools/perf-lab/output/summary/bench-*.json 2>/dev/null | head -1)
           if [[ -z "$LATEST" ]]; then
-            echo "ERROR: no bench artifact produced" >&2
+            echo "ERROR: no e2e bench artifact produced" >&2
             exit 1
           fi
           mkdir -p ci-artifacts
-          cp "$LATEST" ci-artifacts/bench-pr.json
-          echo "PR artifact: $LATEST"
+          cp "$LATEST" ci-artifacts/bench-pr-e2e.json
+          echo "PR e2e artifact: $LATEST"
+
+      - name: Run benchmark on PR branch (parse)
+        run: |
+          tools/perf-lab/target/release/perf-lab bench \
+            --engine marco-core \
+            --mode parse \
+            --iterations 20 \
+            2>&1
+
+      - name: Capture PR parse artifact
+        run: |
+          LATEST=$(ls -1t tools/perf-lab/output/summary/bench-*.json 2>/dev/null | head -1)
+          if [[ -z "$LATEST" ]]; then
+            echo "ERROR: no parse bench artifact produced" >&2
+            exit 1
+          fi
+          mkdir -p ci-artifacts
+          cp "$LATEST" ci-artifacts/bench-pr-parse.json
+          echo "PR parse artifact: $LATEST"
+
+      - name: Merge PR e2e + parse artifacts
+        run: |
+          jq -s 'add' ci-artifacts/bench-pr-e2e.json ci-artifacts/bench-pr-parse.json \
+            > ci-artifacts/bench-pr.json
+          echo "Merged $(jq 'length' ci-artifacts/bench-pr.json) PR record(s)"
 
       - name: Download main-branch baseline artifact
         id: download_baseline
@@ -168,6 +235,25 @@ jobs:
             --warn-threshold "$PERF_WARN_THRESHOLD" \
             --fail-threshold "$PERF_FAIL_THRESHOLD" \
             --min-failures   "$PERF_MIN_FAILURES"
+
+      - name: Run critical-workload regression gate (spec:commonmark, fixture:pathological:*, parse mode)
+        run: |
+          PR_JSON="ci-artifacts/bench-pr.json"
+          BASELINE_JSON="ci-artifacts/baseline/bench-main-latest.json"
+
+          if [[ ! -f "$BASELINE_JSON" ]]; then
+            echo "No baseline artifact found for ${{ github.event.pull_request.base.sha }} — skipping critical gate."
+            exit 0
+          fi
+
+          tools/perf-lab/target/release/perf-lab regression \
+            --baseline "$BASELINE_JSON" \
+            --current  "$PR_JSON" \
+            --critical-only \
+            --mode parse \
+            --warn-threshold "$PERF_WARN_THRESHOLD" \
+            --fail-threshold "$PERF_FAIL_THRESHOLD" \
+            --min-failures   "$PERF_CRITICAL_MIN_FAILURES"
 
       - name: Upload PR benchmark artifact
         if: always()

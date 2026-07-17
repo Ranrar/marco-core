@@ -156,7 +156,10 @@ fn classify(ch: char, before: Option<char>, after: Option<char>) -> (bool, bool)
 /// `ch`), given the character preceding `remaining` in the top-level span
 /// (or `None` at the start of the span). Returns the built [`Delimiter`]
 /// and the rest of the input after the run.
-pub(super) fn tokenize_delimiter_run(remaining: GrammarSpan, before: Option<char>) -> (Delimiter, GrammarSpan) {
+pub(super) fn tokenize_delimiter_run(
+    remaining: GrammarSpan,
+    before: Option<char>,
+) -> (Delimiter, GrammarSpan) {
     let ch = remaining
         .fragment()
         .chars()
@@ -287,7 +290,11 @@ pub(super) fn resolve_emphasis(mut items: Vec<Item>) -> Vec<Node> {
             Some(oi) => {
                 let opener_count = current_count(&items, arena[oi].item_idx);
                 let closer_count = current_count(&items, arena[ci].item_idx);
-                let use_n = if opener_count >= 2 && closer_count >= 2 { 2 } else { 1 };
+                let use_n = if opener_count >= 2 && closer_count >= 2 {
+                    2
+                } else {
+                    1
+                };
 
                 let is_repeat_pair = !matched_pairs.insert((oi, ci));
 
@@ -335,8 +342,9 @@ pub(super) fn resolve_emphasis(mut items: Vec<Item>) -> Vec<Node> {
                 let span = opt_span_range(opener_span, closer_end_span);
 
                 let kind_is_strong = use_n == 2;
-                let is_pure_triple_run =
-                    is_repeat_pair && arena[oi].original_count == 3 && arena[ci].original_count == 3;
+                let is_pure_triple_run = is_repeat_pair
+                    && arena[oi].original_count == 3
+                    && arena[ci].original_count == 3;
                 let wrapped = if is_pure_triple_run
                     && children.len() == 1
                     && is_pure_triple_pair(&children[0], kind_is_strong)

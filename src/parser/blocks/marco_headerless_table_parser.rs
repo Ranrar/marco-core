@@ -12,6 +12,9 @@ use crate::grammar::blocks::gfm_table::split_pipe_row_cells;
 use crate::grammar::blocks::marco_headerless_table::MarcoHeaderlessTableBlock;
 use crate::parser::ast::{Node, NodeKind, TableAlignment};
 
+#[cfg(feature = "parallel-parse")]
+use super::gfm_table_parser::{apply_cell_spans, parse_table_row_shape};
+
 /// Parse an extended headerless table block into an AST node.
 ///
 /// `full_start..full_end` should cover the entire matched table construct (as
@@ -45,6 +48,46 @@ pub fn parse_marco_headerless_table<'a>(
             column_count,
         ));
     }
+
+    Node {
+        kind: NodeKind::Table { alignments },
+        span,
+        children: rows,
+    }
+}
+
+/// Like [`parse_marco_headerless_table`], but defers cell inline-parsing —
+/// see `gfm_table_parser::parse_gfm_table_parallel` (same shape, minus the
+/// header row).
+#[cfg(feature = "parallel-parse")]
+pub fn parse_marco_headerless_table_parallel<'a>(
+    table: MarcoHeaderlessTableBlock<'a>,
+    full_start: GrammarSpan<'a>,
+    full_end: GrammarSpan<'a>,
+) -> Node {
+    let span = crate::parser::shared::opt_span_range(full_start, full_end);
+
+    let delimiter_cells = split_pipe_row_cells(table.delimiter_line);
+
+    let alignments: Vec<TableAlignment> = delimiter_cells
+        .iter()
+        .map(|cell| parse_alignment(cell.fragment()))
+        .collect();
+
+    let column_count = alignments.len();
+
+    let mut rows: Vec<Node> = Vec::new();
+    let mut all_cell_spans: Vec<GrammarSpan<'a>> = Vec::new();
+
+    for body_line in table.body_lines {
+        let body_cells = split_pipe_row_cells(body_line);
+        let (row, spans) =
+            parse_table_row_shape(false, body_line, body_cells, &alignments, column_count);
+        rows.push(row);
+        all_cell_spans.extend(spans);
+    }
+
+    apply_cell_spans(&mut rows, all_cell_spans);
 
     Node {
         kind: NodeKind::Table { alignments },

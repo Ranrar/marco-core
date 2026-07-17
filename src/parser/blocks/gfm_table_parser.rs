@@ -14,6 +14,9 @@ use crate::grammar::blocks::gfm_table::{split_pipe_row_cells, GfmTableBlock};
 use crate::parser::ast::{Node, NodeKind, TableAlignment};
 use nom::Input;
 
+#[cfg(feature = "parallel-parse")]
+use super::parallel_inline::{resolve_pending_batch, PendingSpan};
+
 /// Parse a GFM table block into an AST node.
 ///
 /// `full_start..full_end` should cover the entire matched table construct (as
@@ -69,6 +72,75 @@ pub fn parse_gfm_table<'a>(
     }
 }
 
+/// Like [`parse_gfm_table`], but defers cell inline-parsing: every cell
+/// across every row (header + body) is collected into one flat batch and
+/// resolved in a single parallel fan-out, then patched back in row-major
+/// order — instead of each cell being parsed inline, one at a time, as
+/// `parse_table_row`/`parse_table_cell` do. See `parallel_inline` module
+/// docs for why order-based zipping (not node-identity keying) is safe
+/// here.
+#[cfg(feature = "parallel-parse")]
+pub fn parse_gfm_table_parallel<'a>(
+    table: GfmTableBlock<'a>,
+    full_start: GrammarSpan<'a>,
+    full_end: GrammarSpan<'a>,
+) -> Node {
+    let span = crate::parser::shared::opt_span_range(full_start, full_end);
+
+    let header_cells = split_pipe_row_cells(table.header_line);
+    let delimiter_cells = split_pipe_row_cells(table.delimiter_line);
+
+    let alignments: Vec<TableAlignment> = delimiter_cells
+        .iter()
+        .map(|cell| parse_alignment(cell.fragment()))
+        .collect();
+
+    let column_count = alignments.len();
+
+    let mut rows: Vec<Node> = Vec::new();
+    let mut all_cell_spans: Vec<GrammarSpan<'a>> = Vec::new();
+
+    let (header_row, header_spans) = parse_table_row_shape(
+        true,
+        table.header_line,
+        header_cells,
+        &alignments,
+        column_count,
+    );
+    rows.push(header_row);
+    all_cell_spans.extend(header_spans);
+
+    for body_line in table.body_lines {
+        let body_cells = split_pipe_row_cells(body_line);
+        let (row, spans) =
+            parse_table_row_shape(false, body_line, body_cells, &alignments, column_count);
+        rows.push(row);
+        all_cell_spans.extend(spans);
+    }
+
+    apply_cell_spans(&mut rows, all_cell_spans);
+
+    Node {
+        kind: NodeKind::Table { alignments },
+        span,
+        children: rows,
+    }
+}
+
+/// Resolve `cell_spans` (row-major order, matching how `rows`' cells were
+/// pushed) in one shared parallel batch and patch each cell's `children`.
+#[cfg(feature = "parallel-parse")]
+pub(crate) fn apply_cell_spans<'a>(rows: &mut [Node], cell_spans: Vec<GrammarSpan<'a>>) {
+    let pending: Vec<PendingSpan<'a>> = cell_spans.into_iter().map(PendingSpan::Borrowed).collect();
+    let mut resolved = resolve_pending_batch(pending).into_iter();
+
+    for row in rows.iter_mut() {
+        for cell in row.children.iter_mut() {
+            cell.children = resolved.next().unwrap_or_default();
+        }
+    }
+}
+
 pub(crate) fn parse_table_row<'a>(
     header: bool,
     row_line: GrammarSpan<'a>,
@@ -94,6 +166,49 @@ pub(crate) fn parse_table_row<'a>(
         span: row_span,
         children,
     }
+}
+
+/// Like [`parse_table_row`], but builds cell nodes with empty `children`
+/// and returns their spans (in column order) instead of inline-parsing
+/// them immediately — so `parse_gfm_table_parallel` (and the headerless
+/// table parser's own parallel path) can batch every row's cells together
+/// into one shared fan-out.
+#[cfg(feature = "parallel-parse")]
+pub(crate) fn parse_table_row_shape<'a>(
+    header: bool,
+    row_line: GrammarSpan<'a>,
+    mut cells: Vec<GrammarSpan<'a>>,
+    alignments: &[TableAlignment],
+    column_count: usize,
+) -> (Node, Vec<GrammarSpan<'a>>) {
+    let row_span = opt_span(row_line);
+
+    normalize_cells_to_column_count(&mut cells, row_line, column_count);
+
+    let mut children: Vec<Node> = Vec::with_capacity(column_count);
+    let mut cell_spans: Vec<GrammarSpan<'a>> = Vec::with_capacity(column_count);
+    for (col_idx, cell_span) in cells.into_iter().enumerate().take(column_count) {
+        let alignment = alignments
+            .get(col_idx)
+            .copied()
+            .unwrap_or(TableAlignment::None);
+        let span = opt_span(cell_span);
+        children.push(Node {
+            kind: NodeKind::TableCell { header, alignment },
+            span,
+            children: Vec::new(),
+        });
+        cell_spans.push(cell_span);
+    }
+
+    (
+        Node {
+            kind: NodeKind::TableRow { header },
+            span: row_span,
+            children,
+        },
+        cell_spans,
+    )
 }
 
 fn parse_table_cell<'a>(

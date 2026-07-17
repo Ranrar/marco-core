@@ -83,11 +83,10 @@ pub fn parse_inlines_from_span(span: GrammarSpan) -> Result<Vec<Node>, Box<dyn s
     // text on retry — see `bracket_match` module docs. Scoped to this call
     // (including any nested `parse_inlines_from_span` calls it makes, e.g.
     // for link text) via RAII; restored on return.
-    let _bracket_guard =
-        crate::grammar::inlines::bracket_match::BracketCacheGuard::install(
-            span.location_offset(),
-            span.fragment(),
-        );
+    let _bracket_guard = crate::grammar::inlines::bracket_match::BracketCacheGuard::install(
+        span.location_offset(),
+        span.fragment(),
+    );
 
     let mut items: Vec<Item> = Vec::with_capacity(8);
     let mut remaining = span;

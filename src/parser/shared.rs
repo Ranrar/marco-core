@@ -46,6 +46,20 @@ impl Drop for ParseOptionsGuard {
     }
 }
 
+/// Returns whether position tracking is enabled in the current parse context.
+///
+/// Exists mainly so callers that need to *capture* the current thread's
+/// option values (e.g. before dispatching work onto other threads, where
+/// `ParseOptionsGuard` must be re-installed per closure — thread-locals
+/// don't propagate to new threads) don't have to reach into `opt_span`'s
+/// private `TRACK_POSITIONS` read. Only such a caller exists today
+/// (`parallel_inline`, behind `parallel-parse`), hence the `cfg`.
+#[cfg(feature = "parallel-parse")]
+#[inline]
+pub(crate) fn track_positions_enabled() -> bool {
+    TRACK_POSITIONS.with(|c| c.get())
+}
+
 /// Returns whether math parsing is enabled in the current parse context.
 #[inline]
 pub(crate) fn parse_math_enabled() -> bool {

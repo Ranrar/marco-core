@@ -35,6 +35,9 @@ pub mod marco_headerless_table_parser;
 pub mod marco_sliders_parser;
 /// Extended tab block parser.
 pub mod marco_tab_blocks_parser;
+/// Shared primitives for deferring inline parsing under `parallel-parse`.
+#[cfg(feature = "parallel-parse")]
+pub(crate) mod parallel_inline;
 
 /// Re-export shared block parser utilities.
 pub use shared::{dedent_list_item_content, to_parser_span, to_parser_span_range, GrammarSpan};
@@ -191,6 +194,14 @@ fn parse_blocks_internal(
     let mut nodes = Vec::new();
     let mut document = Document::new(); // Create document early to collect references
     let mut remaining = GrammarSpan::new(input);
+
+    // Paragraphs and footnote-definition bodies (both leaf-level, both
+    // built directly in this loop) defer inline parsing and accumulate
+    // here; resolved and patched back into `nodes` once, right before this
+    // function returns — see `parallel_inline` module docs for why this is
+    // safe and why it's keyed by position, not node identity.
+    #[cfg(feature = "parallel-parse")]
+    let mut pending_leaves: Vec<parallel_inline::PendingLeaf<'_>> = Vec::new();
 
     // Safety: prevent infinite loops.
     // This must be high enough for real documents; the progress-check below is the
@@ -498,6 +509,33 @@ fn parse_blocks_internal(
 
         // Try parsing link reference definition
         // Must come BEFORE paragraph to avoid treating definitions as paragraphs
+        #[cfg(feature = "parallel-parse")]
+        if depth == 0 {
+            if let Some((rest, node, content)) =
+                gfm_footnote_definition_parser::parse_footnote_definition_shape(remaining)
+            {
+                let node_index = nodes.len();
+                if !content.is_empty() {
+                    pending_leaves.push(parallel_inline::PendingLeaf {
+                        node_index,
+                        nested_child_index: Some(0),
+                        segments: vec![parallel_inline::Segment::Pending(
+                            parallel_inline::PendingSpan::Owned(content),
+                        )],
+                    });
+                }
+                nodes.push(node);
+                remaining = rest;
+                continue;
+            }
+        } else if let Some((rest, node)) =
+            gfm_footnote_definition_parser::parse_footnote_definition(remaining)
+        {
+            nodes.push(node);
+            remaining = rest;
+            continue;
+        }
+        #[cfg(not(feature = "parallel-parse"))]
         if let Some((rest, node)) =
             gfm_footnote_definition_parser::parse_footnote_definition(remaining)
         {
@@ -518,6 +556,29 @@ fn parse_blocks_internal(
         // Also try parsing extended "headerless" pipe tables (delimiter-first).
         // Must come BEFORE paragraph for the same reason.
         let headerless_table_start = remaining;
+        #[cfg(feature = "parallel-parse")]
+        if depth == 0 {
+            if let Ok((rest, table)) = grammar::headerless_table(remaining) {
+                nodes.push(
+                    marco_headerless_table_parser::parse_marco_headerless_table_parallel(
+                        table,
+                        headerless_table_start,
+                        rest,
+                    ),
+                );
+                remaining = rest;
+                continue;
+            }
+        } else if let Ok((rest, table)) = grammar::headerless_table(remaining) {
+            nodes.push(marco_headerless_table_parser::parse_marco_headerless_table(
+                table,
+                headerless_table_start,
+                rest,
+            ));
+            remaining = rest;
+            continue;
+        }
+        #[cfg(not(feature = "parallel-parse"))]
         if let Ok((rest, table)) = grammar::headerless_table(remaining) {
             nodes.push(marco_headerless_table_parser::parse_marco_headerless_table(
                 table,
@@ -529,6 +590,23 @@ fn parse_blocks_internal(
         }
 
         let table_start = remaining;
+        #[cfg(feature = "parallel-parse")]
+        if depth == 0 {
+            if let Ok((rest, table)) = grammar::gfm_table(remaining) {
+                nodes.push(gfm_table_parser::parse_gfm_table_parallel(
+                    table,
+                    table_start,
+                    rest,
+                ));
+                remaining = rest;
+                continue;
+            }
+        } else if let Ok((rest, table)) = grammar::gfm_table(remaining) {
+            nodes.push(gfm_table_parser::parse_gfm_table(table, table_start, rest));
+            remaining = rest;
+            continue;
+        }
+        #[cfg(not(feature = "parallel-parse"))]
         if let Ok((rest, table)) = grammar::gfm_table(remaining) {
             nodes.push(gfm_table_parser::parse_gfm_table(table, table_start, rest));
             remaining = rest;
@@ -569,6 +647,28 @@ fn parse_blocks_internal(
         }
 
         // Try parsing paragraph
+        #[cfg(feature = "parallel-parse")]
+        if depth == 0 {
+            if let Ok((rest, content)) = grammar::paragraph(remaining) {
+                let (node, segments) = cm_paragraph_parser::parse_paragraph_shape(content);
+                let node_index = nodes.len();
+                if !segments.is_empty() {
+                    pending_leaves.push(parallel_inline::PendingLeaf {
+                        node_index,
+                        nested_child_index: None,
+                        segments,
+                    });
+                }
+                nodes.push(node);
+                remaining = rest;
+                continue;
+            }
+        } else if let Ok((rest, content)) = grammar::paragraph(remaining) {
+            nodes.push(cm_paragraph_parser::parse_paragraph(content));
+            remaining = rest;
+            continue;
+        }
+        #[cfg(not(feature = "parallel-parse"))]
         if let Ok((rest, content)) = grammar::paragraph(remaining) {
             nodes.push(cm_paragraph_parser::parse_paragraph(content));
             remaining = rest;
@@ -598,6 +698,14 @@ fn parse_blocks_internal(
     }
 
     log::info!("Parsed {} blocks", nodes.len());
+
+    // Resolve every deferred paragraph/footnote-definition-body in one
+    // shared parallel batch and patch results back into `nodes`, before
+    // this function's children are handed to its (possibly recursive)
+    // caller. Nested containers (blockquote/list/etc.) get their own
+    // independent batch this way, since they call this function again.
+    #[cfg(feature = "parallel-parse")]
+    parallel_inline::apply_pending_leaves(&mut nodes, pending_leaves);
 
     // Add parsed nodes to document
     document.children = nodes;
@@ -713,6 +821,13 @@ fn parse_extended_definition_list<'a>(
     let mut children: Vec<Node> = Vec::new();
     let mut cursor = 0usize;
     let mut parsed_any = false;
+    // Deferred term inline-parsing, resolved in one batch just before this
+    // function returns — see `parallel_inline` module docs. Description
+    // bodies need no separate handling here: they're recursively
+    // block-parsed below via `parse_blocks_internal`, which does its own
+    // independent batch the same way.
+    #[cfg(feature = "parallel-parse")]
+    let mut pending_leaves: Vec<parallel_inline::PendingLeaf<'a>> = Vec::new();
 
     // Parse one or more items.
     loop {
@@ -744,23 +859,66 @@ fn parse_extended_definition_list<'a>(
         // Build the <dt> node.
         let term_start_span = input.take_from(term_start);
         let (term_after_span, term_taken_span) = term_start_span.take_split(term_end - term_start);
-        let term_children = match crate::parser::inlines::parse_inlines_from_span(term_taken_span) {
-            Ok(children) => children,
-            Err(e) => {
-                log::warn!("Failed to parse inline elements in definition term: {}", e);
-                vec![Node {
-                    kind: NodeKind::Text(term_taken_span.fragment().to_string()),
-                    span: crate::parser::shared::opt_span(term_taken_span),
-                    children: Vec::new(),
-                }]
-            }
-        };
+        let term_span = crate::parser::shared::opt_span_range(term_start_span, term_after_span);
 
-        children.push(Node {
-            kind: NodeKind::DefinitionTerm,
-            span: crate::parser::shared::opt_span_range(term_start_span, term_after_span),
-            children: term_children,
-        });
+        #[cfg(feature = "parallel-parse")]
+        if depth == 0 {
+            let node_index = children.len();
+            if !term_taken_span.fragment().is_empty() {
+                pending_leaves.push(parallel_inline::PendingLeaf {
+                    node_index,
+                    nested_child_index: None,
+                    segments: vec![parallel_inline::Segment::Pending(
+                        parallel_inline::PendingSpan::Borrowed(term_taken_span),
+                    )],
+                });
+            }
+            children.push(Node {
+                kind: NodeKind::DefinitionTerm,
+                span: term_span,
+                children: Vec::new(),
+            });
+        } else {
+            let term_children =
+                match crate::parser::inlines::parse_inlines_from_span(term_taken_span) {
+                    Ok(children) => children,
+                    Err(e) => {
+                        log::warn!("Failed to parse inline elements in definition term: {}", e);
+                        vec![Node {
+                            kind: NodeKind::Text(term_taken_span.fragment().to_string()),
+                            span: crate::parser::shared::opt_span(term_taken_span),
+                            children: Vec::new(),
+                        }]
+                    }
+                };
+
+            children.push(Node {
+                kind: NodeKind::DefinitionTerm,
+                span: term_span,
+                children: term_children,
+            });
+        }
+        #[cfg(not(feature = "parallel-parse"))]
+        {
+            let term_children =
+                match crate::parser::inlines::parse_inlines_from_span(term_taken_span) {
+                    Ok(children) => children,
+                    Err(e) => {
+                        log::warn!("Failed to parse inline elements in definition term: {}", e);
+                        vec![Node {
+                            kind: NodeKind::Text(term_taken_span.fragment().to_string()),
+                            span: crate::parser::shared::opt_span(term_taken_span),
+                            children: Vec::new(),
+                        }]
+                    }
+                };
+
+            children.push(Node {
+                kind: NodeKind::DefinitionTerm,
+                span: term_span,
+                children: term_children,
+            });
+        }
 
         // Parse one or more definitions for this term.
         cursor = after_term;
@@ -875,6 +1033,9 @@ fn parse_extended_definition_list<'a>(
     if !parsed_any {
         return None;
     }
+
+    #[cfg(feature = "parallel-parse")]
+    parallel_inline::apply_pending_leaves(&mut children, pending_leaves);
 
     let (rest, _taken) = input.take_split(cursor);
     let span = crate::parser::shared::opt_span_range(input, rest);

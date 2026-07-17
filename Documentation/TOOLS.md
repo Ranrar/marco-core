@@ -133,8 +133,19 @@ perf-lab regression [OPTIONS]
   --warn-threshold PCT   Warn if > this % regression (default: 10)
   --fail-threshold PCT   Fail if > this % regression (default: 20)
   --min-failures N       Min records to fail on (default: 2)
-  --critical-only        Gate only on "critical" profiles
+  --critical-only        Gate only on "critical" workloads — id/profile
+                          containing "critical", plus spec:commonmark and
+                          fixture:pathological:* explicitly
+  --mode MODE            Only compare records in this mode (parse / render /
+                          e2e / intelligence); default compares every mode
+                          present in both files
 ```
+
+Matching is exact on `(engine, workload_id, mode)` — a baseline file that
+only contains one mode's records will never match a current run in a
+different mode, so any script feeding this command two artifacts must make
+sure both cover the same mode(s). `ci-perf.yml` merges its e2e and parse
+runs into one artifact per side for exactly this reason (see below).
 
 ### Engine adapters
 
@@ -194,18 +205,37 @@ cargo test  --manifest-path tools/marco-ast/Cargo.toml
 cargo build --manifest-path tools/perf-lab/Cargo.toml --release
 cargo test  --manifest-path tools/perf-lab/Cargo.toml
 
-# Extension spec conformance (via perf-lab test runner)
-cargo test --manifest-path tools/perf-lab/Cargo.toml --test extension_spec_it
+# Extension spec conformance (declared in the root Cargo.toml, not perf-lab's —
+# the [[test]] entry points at tools/tests/extension_spec_it.rs)
+cargo test --test extension_spec_it
 ```
 
 ## CI — `.github/workflows/ci-perf.yml`
 
 Two-stage performance workflow:
 
-- **Push to `main`:** Run `bench --mode e2e --iterations 30` and `bench --mode parse --iterations 30`.
-  Upload `BenchRecord` JSON artifact (30-day retention, keyed by commit SHA).
-- **Pull request:** Run `bench --iterations 20` on the PR branch, download base-SHA artifact,
-  call `regression --warn-threshold 10 --fail-threshold 20 --min-failures 2`.
-  Skip gracefully if no baseline exists.
+- **Push to `main`:** Run `bench --mode e2e --iterations 30` and
+  `bench --mode parse --iterations 30`, then merge both runs' JSON with
+  `jq -s add` into one artifact (30-day retention, keyed by commit SHA).
+  Merging matters because `regression` matches records by
+  `(engine, workload_id, mode)` exactly — a baseline containing only one
+  mode would silently fail to match a current run in a different mode.
+- **Pull request:** Run `bench --iterations 20` in both modes on the PR
+  branch, merge the same way, download the base-SHA artifact, then run
+  **two** gates:
+  - the broad gate — `regression --warn-threshold 10 --fail-threshold 20
+    --min-failures 2` — fails if 2+ workloads (any of them, any mode)
+    regress past 20%.
+  - the critical-workload gate — `regression --critical-only --mode parse
+    --warn-threshold 10 --fail-threshold 20 --min-failures 1` — fails if
+    `spec:commonmark` or any `fixture:pathological:*` workload regresses
+    past 20% in parse time *on its own*. These are the workloads
+    `.dev/parser-render-optimization-plan.md` brought down from
+    ~70-212x slower than comparable engines to within a few x; this gate
+    is what actually satisfies that plan's Phase 5 goal ("CI fails a PR
+    that regresses spec:commonmark or fixture:pathological parse time by
+    >20%") — the broad gate alone doesn't, since it needs a second,
+    unrelated regression to also trip.
 
-This gates PRs against a 20% median latency regression on 2+ workloads.
+  Both gates skip gracefully if no baseline artifact exists (first run, or
+  after the 30-day artifact TTL expires).

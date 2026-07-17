@@ -142,7 +142,11 @@ fn collect_footnote_definitions<'a>(node: &'a Node, defs: &mut HashMap<String, &
 fn precompute_highlights(document: &Document, options: &RenderOptions) -> HashMap<usize, String> {
     use rayon::prelude::*;
 
-    fn collect<'a>(node: &'a Node, options: &RenderOptions, targets: &mut Vec<(usize, &'a str, &'a str)>) {
+    fn collect<'a>(
+        node: &'a Node,
+        options: &RenderOptions,
+        targets: &mut Vec<(usize, &'a str, &'a str)>,
+    ) {
         if let NodeKind::CodeBlock { language, code } = &node.kind {
             if options.syntax_highlighting {
                 let language_raw = language.as_deref().map(str::trim).filter(|s| !s.is_empty());
@@ -1957,8 +1961,12 @@ mod tests {
         // And the footnote reordering itself must still hold: "b" (first
         // referenced) before "a", even though "a" was collected first by
         // `precompute_highlights`'s tree walk.
-        let b_pos = result.find(&b_html).expect("b highlighted fragment present");
-        let a_pos = result.find(&a_html).expect("a highlighted fragment present");
+        let b_pos = result
+            .find(&b_html)
+            .expect("b highlighted fragment present");
+        let a_pos = result
+            .find(&a_html)
+            .expect("a highlighted fragment present");
         assert!(
             b_pos < a_pos,
             "footnote \"b\" should render before footnote \"a\" \

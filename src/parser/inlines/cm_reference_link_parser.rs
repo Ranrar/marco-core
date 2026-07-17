@@ -125,8 +125,8 @@ pub fn parse_reference_link(input: GrammarSpan) -> IResult<GrammarSpan, Node> {
     // Find closing bracket for first link text, allowing nested brackets and
     // treating escaped brackets as literal text.
     let abs_base_offset = start_input.location_offset();
-    let absolute_bracket_pos =
-        find_matching_closing_bracket(content_str, 0, true, abs_base_offset).ok_or_else(|| {
+    let absolute_bracket_pos = find_matching_closing_bracket(content_str, 0, true, abs_base_offset)
+        .ok_or_else(|| {
             nom::Err::Error(nom::error::Error::new(
                 input,
                 nom::error::ErrorKind::TakeUntil,
@@ -193,14 +193,18 @@ pub fn parse_reference_link(input: GrammarSpan) -> IResult<GrammarSpan, Node> {
             consumed_len = after_first_bracket + 2;
         } else {
             // Full reference link: `[label]`
-            let close2_abs =
-                find_matching_closing_bracket(content_str, after_first_bracket, false, abs_base_offset)
-                    .ok_or_else(|| {
-                    nom::Err::Error(nom::error::Error::new(
-                        input,
-                        nom::error::ErrorKind::TakeUntil,
-                    ))
-                })?;
+            let close2_abs = find_matching_closing_bracket(
+                content_str,
+                after_first_bracket,
+                false,
+                abs_base_offset,
+            )
+            .ok_or_else(|| {
+                nom::Err::Error(nom::error::Error::new(
+                    input,
+                    nom::error::ErrorKind::TakeUntil,
+                ))
+            })?;
 
             let label_str = &content_str[(after_first_bracket + 1)..close2_abs];
             if !is_valid_reference_label_content(label_str) {

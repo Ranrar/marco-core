@@ -13,6 +13,33 @@ use nom::Input;
 /// Returns `Some((rest, node))` on success, or `None` if the input does not
 /// start with a footnote definition.
 pub fn parse_footnote_definition(input: GrammarSpan) -> Option<(GrammarSpan, Node)> {
+    parse_footnote_definition_impl(input, true).map(|(rest, node, _content)| (rest, node))
+}
+
+/// Like [`parse_footnote_definition`], but instead of inline-parsing the
+/// body immediately, returns the shape (a `FootnoteDefinition` node wrapping
+/// a single childless `Paragraph` node) alongside the assembled owned
+/// content string still needing inline parsing — so it can be deferred and
+/// batched with other paragraphs under the `parallel-parse` feature. The
+/// content is already an owned, hand-assembled `String` today (continuation
+/// lines have their indentation stripped, so it isn't a contiguous span of
+/// the original input), matching `parallel_inline::PendingSpan::Owned`.
+#[cfg(feature = "parallel-parse")]
+pub(crate) fn parse_footnote_definition_shape(
+    input: GrammarSpan,
+) -> Option<(GrammarSpan, Node, String)> {
+    parse_footnote_definition_impl(input, false)
+}
+
+/// Shared implementation. `eager` selects whether the body is inline-parsed
+/// here (the pre-`parallel-parse` behavior, returned content is always
+/// `String::new()` and ignored by the `eager` caller) or left for the
+/// caller to defer (content returned, `node`'s sole child `Paragraph` has
+/// empty `children`).
+fn parse_footnote_definition_impl(
+    input: GrammarSpan,
+    eager: bool,
+) -> Option<(GrammarSpan, Node, String)> {
     let frag = input.fragment();
 
     // Only check the first line quickly.
@@ -167,13 +194,22 @@ pub fn parse_footnote_definition(input: GrammarSpan) -> Option<(GrammarSpan, Nod
 
     // Parse the definition content as paragraph-like blocks.
     // NOTE: We keep this conservative for now: a single paragraph with inline parsing.
-    let content_children = match crate::parser::inlines::parse_inlines(&content) {
-        Ok(nodes) => nodes,
-        Err(_) => vec![Node {
-            kind: NodeKind::Text(content),
-            span: None,
-            children: Vec::new(),
-        }],
+    //
+    // When `eager` is false (the `parallel-parse` shape path), inline
+    // parsing is skipped here — the caller batches `content` together with
+    // other pending spans and fills the paragraph's `children` in later.
+    let (content_children, returned_content) = if eager {
+        let children = match crate::parser::inlines::parse_inlines(&content) {
+            Ok(nodes) => nodes,
+            Err(_) => vec![Node {
+                kind: NodeKind::Text(content),
+                span: None,
+                children: Vec::new(),
+            }],
+        };
+        (children, String::new())
+    } else {
+        (Vec::new(), content)
     };
 
     let paragraph = Node {
@@ -190,7 +226,7 @@ pub fn parse_footnote_definition(input: GrammarSpan) -> Option<(GrammarSpan, Nod
         children: vec![paragraph],
     };
 
-    Some((rest, node))
+    Some((rest, node, returned_content))
 }
 
 #[cfg(test)]

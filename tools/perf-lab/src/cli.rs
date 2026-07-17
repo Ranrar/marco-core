@@ -157,7 +157,8 @@ pub struct RegressionOptions {
 
     #[arg(
         long,
-        help = "Only gate on workloads tagged as critical (contain 'critical' in profile or id)"
+        help = "Only gate on workloads tagged as critical (contain 'critical' in profile or id, \
+                or are spec:commonmark / fixture:pathological:*)"
     )]
     pub critical_only: bool,
 
@@ -168,4 +169,13 @@ pub struct RegressionOptions {
         help = "Minimum number of regressions required to trigger a hard failure (default: 2)"
     )]
     pub min_failures: usize,
+
+    #[arg(
+        long,
+        value_enum,
+        value_name = "MODE",
+        help = "Only compare records in this mode (parse/render/e2e/intelligence); \
+                default compares every mode present in both files"
+    )]
+    pub mode: Option<Mode>,
 }
