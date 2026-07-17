@@ -8,19 +8,19 @@
 // Shared utilities for all inline parsers
 pub mod shared;
 
+// Emphasis/strong delimiter-stack resolution (CommonMark spec 6.2, Appendix A).
+mod emphasis;
+
 // Individual inline parser modules
 pub mod cm_autolink_parser;
 pub mod cm_backslash_escape_parser;
 pub mod cm_code_span_parser;
-pub mod cm_emphasis_parser;
 pub mod cm_entity_reference_parser;
 pub mod cm_image_parser;
 pub mod cm_inline_html_parser;
 pub mod cm_line_breaks_parser;
 pub mod cm_link_parser;
 pub mod cm_reference_link_parser;
-pub mod cm_strong_emphasis_parser;
-pub mod cm_strong_parser;
 pub mod gfm_autolink_literal_parser;
 pub mod gfm_footnote_reference_parser;
 pub mod gfm_strikethrough_parser;
@@ -41,15 +41,12 @@ pub mod text_parser;
 pub use cm_autolink_parser::parse_autolink;
 pub use cm_backslash_escape_parser::parse_backslash_escape;
 pub use cm_code_span_parser::parse_code_span;
-pub use cm_emphasis_parser::parse_emphasis;
 pub use cm_entity_reference_parser::parse_entity_reference;
 pub use cm_image_parser::parse_image;
 pub use cm_inline_html_parser::parse_inline_html;
 pub use cm_line_breaks_parser::{parse_hard_line_break, parse_soft_line_break};
 pub use cm_link_parser::parse_link;
 pub use cm_reference_link_parser::parse_reference_link;
-pub use cm_strong_emphasis_parser::parse_strong_emphasis;
-pub use cm_strong_parser::parse_strong;
 pub use gfm_autolink_literal_parser::parse_gfm_autolink_literal;
 pub use gfm_footnote_reference_parser::parse_footnote_reference;
 pub use gfm_strikethrough_parser::parse_strikethrough;
@@ -66,9 +63,10 @@ pub use math_display_parser::parse_display_math;
 pub use math_inline_parser::parse_inline_math;
 pub use text_parser::{parse_special_as_text, parse_text};
 
-use super::ast::{Node, NodeKind};
+use super::ast::Node;
+use emphasis::{resolve_emphasis, tokenize_delimiter_run, Item};
 use nom::bytes::complete::take;
-use shared::{opt_span, GrammarSpan};
+use shared::GrammarSpan;
 
 /// Parse inline elements within text content
 /// Takes a GrammarSpan to preserve position information
@@ -80,7 +78,7 @@ pub fn parse_inlines_from_span(span: GrammarSpan) -> Result<Vec<Node>, Box<dyn s
         span.fragment()
     );
 
-    let mut nodes = Vec::with_capacity(8);
+    let mut items: Vec<Item> = Vec::with_capacity(8);
     let mut remaining = span;
 
     // Safety: prevent infinite loops
@@ -161,7 +159,7 @@ pub fn parse_inlines_from_span(span: GrammarSpan) -> Result<Vec<Node>, Box<dyn s
             };
         if safe_to_fast_path {
             if let Ok((rest, node)) = parse_text(remaining) {
-                nodes.push(node);
+                items.push(Item::Node(node));
                 remaining = rest;
                 continue;
             }
@@ -172,7 +170,7 @@ pub fn parse_inlines_from_span(span: GrammarSpan) -> Result<Vec<Node>, Box<dyn s
 
         // Try parsing code span first (highest priority to avoid conflicts)
         if let Ok((rest, node)) = parse_code_span(remaining) {
-            nodes.push(node);
+            items.push(Item::Node(node));
             remaining = rest;
             continue;
         }
@@ -180,14 +178,14 @@ pub fn parse_inlines_from_span(span: GrammarSpan) -> Result<Vec<Node>, Box<dyn s
         // Try parsing display math before inline math (avoid $$ being parsed as two $)
         if crate::parser::shared::parse_math_enabled() {
             if let Ok((rest, node)) = parse_display_math(remaining) {
-                nodes.push(node);
+                items.push(Item::Node(node));
                 remaining = rest;
                 continue;
             }
 
             // Try parsing inline math
             if let Ok((rest, node)) = parse_inline_math(remaining) {
-                nodes.push(node);
+                items.push(Item::Node(node));
                 remaining = rest;
                 continue;
             }
@@ -195,7 +193,7 @@ pub fn parse_inlines_from_span(span: GrammarSpan) -> Result<Vec<Node>, Box<dyn s
 
         // Try parsing backslash escape (before other inline elements)
         if let Ok((rest, node)) = parse_backslash_escape(remaining) {
-            nodes.push(node);
+            items.push(Item::Node(node));
             remaining = rest;
             continue;
         }
@@ -203,62 +201,36 @@ pub fn parse_inlines_from_span(span: GrammarSpan) -> Result<Vec<Node>, Box<dyn s
         // Extension inlines (non-CommonMark): try these early so their delimiter
         // sequences aren't consumed as plain text.
         if let Ok((rest, node)) = parse_strikethrough(remaining) {
-            nodes.push(node);
+            items.push(Item::Node(node));
             remaining = rest;
             continue;
         }
 
         if let Ok((rest, node)) = parse_dash_strikethrough(remaining) {
-            nodes.push(node);
+            items.push(Item::Node(node));
             remaining = rest;
             continue;
         }
 
         if let Ok((rest, node)) = parse_mark(remaining) {
-            nodes.push(node);
+            items.push(Item::Node(node));
             remaining = rest;
             continue;
         }
 
-        // CommonMark underscore emphasis has special delimiter rules. In
-        // particular, intraword underscores (alnum _ alnum) should not open
-        // or close emphasis. Because our parser advances left-to-right, the
-        // underscore parsers may not be able to see the previous character.
-        //
-        // Workaround: when we're at an underscore run and the previous emitted
-        // character is alphanumeric and the next character after the run is
-        // alphanumeric, consume the underscore run as literal text.
-        if let Some(run_len) = intraword_underscore_run_len(&nodes, remaining.fragment()) {
-            if let Ok((rest, consumed)) = take::<_, _, nom::error::Error<_>>(run_len)(remaining) {
-                nodes.push(Node {
-                    kind: NodeKind::Text("_".repeat(run_len)),
-                    span: opt_span(consumed),
-                    children: Vec::new(),
-                });
-                remaining = rest;
-                continue;
-            }
-        }
-
-        // Try parsing strong+emphasis (***text*** / ___text___) before strong
-        // so we don't consume the first two delimiters as strong and leave a
-        // dangling delimiter behind.
-        if let Ok((rest, node)) = parse_strong_emphasis(remaining) {
-            nodes.push(node);
-            remaining = rest;
-            continue;
-        }
-
-        // Try parsing strong (must come before emphasis to match ** before *)
-        if let Ok((rest, node)) = parse_strong(remaining) {
-            nodes.push(node);
-            remaining = rest;
-            continue;
-        }
-
-        // Try parsing emphasis
-        if let Ok((rest, node)) = parse_emphasis(remaining) {
-            nodes.push(node);
+        // Emphasis-family delimiter runs (`*`/`_`). Rather than resolving
+        // immediately here, tokenize the run and defer matching to
+        // `resolve_emphasis` once the whole span has been tokenized — see
+        // the `emphasis` module for why (this is what makes nested/unbalanced
+        // delimiter runs linear instead of super-linear, and it's also what
+        // correctly implements the CommonMark left/right-flanking and
+        // intraword-underscore rules instead of the ad hoc special case this
+        // replaced).
+        if first_byte == b'*' || first_byte == b'_' {
+            let consumed_len = remaining.location_offset() - span.location_offset();
+            let before = span.fragment()[..consumed_len].chars().next_back();
+            let (delim, rest) = tokenize_delimiter_run(remaining, before);
+            items.push(Item::Delim(delim));
             remaining = rest;
             continue;
         }
@@ -266,40 +238,40 @@ pub fn parse_inlines_from_span(span: GrammarSpan) -> Result<Vec<Node>, Box<dyn s
         // Extended syntax: inline footnotes `^[...]`.
         // Try before superscript since both start with '^'.
         if let Ok((rest, (ref_node, def_node))) = parse_inline_footnote(remaining) {
-            nodes.push(ref_node);
-            nodes.push(def_node);
+            items.push(Item::Node(ref_node));
+            items.push(Item::Node(def_node));
             remaining = rest;
             continue;
         }
 
         if let Ok((rest, node)) = parse_superscript(remaining) {
-            nodes.push(node);
+            items.push(Item::Node(node));
             remaining = rest;
             continue;
         }
 
         if let Ok((rest, node)) = parse_subscript_arrow(remaining) {
-            nodes.push(node);
+            items.push(Item::Node(node));
             remaining = rest;
             continue;
         }
 
         if let Ok((rest, node)) = parse_subscript(remaining) {
-            nodes.push(node);
+            items.push(Item::Node(node));
             remaining = rest;
             continue;
         }
 
         // Try parsing GFM autolink literals (www/http(s)/email/protocol forms)
         if let Ok((rest, node)) = parse_gfm_autolink_literal(remaining) {
-            nodes.push(node);
+            items.push(Item::Node(node));
             remaining = rest;
             continue;
         }
 
         // Try parsing autolink (must come before link and inline HTML since syntax starts with <)
         if let Ok((rest, node)) = parse_autolink(remaining) {
-            nodes.push(node);
+            items.push(Item::Node(node));
             remaining = rest;
             continue;
         }
@@ -307,16 +279,16 @@ pub fn parse_inlines_from_span(span: GrammarSpan) -> Result<Vec<Node>, Box<dyn s
         // Try parsing GFM-style footnote references `[^label]`.
         // Must come before link parsing since it also starts with '['.
         if let Ok((rest, node)) = parse_footnote_reference(remaining) {
-            nodes.push(node);
+            items.push(Item::Node(node));
             remaining = rest;
             continue;
         }
 
         // Extended syntax: inline task checkbox markers mid-paragraph.
         // This must come before link parsing since it starts with '['.
-        if is_task_checkbox_inline_start_boundary_ok(&nodes, remaining.fragment()) {
+        if is_task_checkbox_inline_start_boundary_ok(&items, remaining.fragment()) {
             if let Ok((rest, node)) = parse_task_checkbox_inline(remaining) {
-                nodes.push(node);
+                items.push(Item::Node(node));
                 remaining = rest;
                 continue;
             }
@@ -324,28 +296,28 @@ pub fn parse_inlines_from_span(span: GrammarSpan) -> Result<Vec<Node>, Box<dyn s
 
         // Try parsing image (must come before link since syntax is similar but starts with !)
         if let Ok((rest, node)) = parse_image(remaining) {
-            nodes.push(node);
+            items.push(Item::Node(node));
             remaining = rest;
             continue;
         }
 
         // Try parsing link
         if let Ok((rest, node)) = parse_link(remaining) {
-            nodes.push(node);
+            items.push(Item::Node(node));
             remaining = rest;
             continue;
         }
 
         // Try parsing reference-style links (CommonMark)
         if let Ok((rest, node)) = parse_reference_link(remaining) {
-            nodes.push(node);
+            items.push(Item::Node(node));
             remaining = rest;
             continue;
         }
 
         // Try parsing inline HTML
         if let Ok((rest, node)) = parse_inline_html(remaining) {
-            nodes.push(node);
+            items.push(Item::Node(node));
             remaining = rest;
             continue;
         }
@@ -356,49 +328,49 @@ pub fn parse_inlines_from_span(span: GrammarSpan) -> Result<Vec<Node>, Box<dyn s
                 "Parsed hard line break at offset {}",
                 remaining.location_offset()
             );
-            nodes.push(node);
+            items.push(Item::Node(node));
             remaining = rest;
             continue;
         }
 
         // Try parsing soft line break (regular newline)
         if let Ok((rest, node)) = parse_soft_line_break(remaining) {
-            nodes.push(node);
+            items.push(Item::Node(node));
             remaining = rest;
             continue;
         }
 
         // Try parsing entity references (e.g. &copy;, &#169;)
         if let Ok((rest, node)) = parse_entity_reference(remaining) {
-            nodes.push(node);
+            items.push(Item::Node(node));
             remaining = rest;
             continue;
         }
 
         // Try parsing emoji shortcodes (extended syntax), e.g. :joy:
         if let Ok((rest, node)) = parse_emoji_shortcode(remaining) {
-            nodes.push(node);
+            items.push(Item::Node(node));
             remaining = rest;
             continue;
         }
 
         // Try parsing platform mentions (extended syntax), e.g. @user[github](Name)
         if let Ok((rest, node)) = parse_platform_mention(remaining) {
-            nodes.push(node);
+            items.push(Item::Node(node));
             remaining = rest;
             continue;
         }
 
         // No inline element matched - try parsing plain text
         if let Ok((rest, node)) = parse_text(remaining) {
-            nodes.push(node);
+            items.push(Item::Node(node));
             remaining = rest;
             continue;
         }
 
         // Special character that didn't parse as any inline element - consume as text
         if let Ok((rest, node)) = parse_special_as_text(remaining) {
-            nodes.push(node);
+            items.push(Item::Node(node));
             remaining = rest;
             continue;
         }
@@ -412,52 +384,26 @@ pub fn parse_inlines_from_span(span: GrammarSpan) -> Result<Vec<Node>, Box<dyn s
         break;
     }
 
+    let nodes = resolve_emphasis(items);
     log::debug!("Parsed {} inline nodes", nodes.len());
     Ok(nodes)
 }
 
-fn intraword_underscore_run_len(nodes: &[Node], fragment: &str) -> Option<usize> {
-    if !fragment.starts_with('_') {
-        return None;
-    }
-
-    let prev = last_emitted_char(nodes)?;
-    if !prev.is_alphanumeric() {
-        return None;
-    }
-
-    let run_len = fragment.chars().take_while(|&c| c == '_').count();
-    let after = fragment.chars().nth(run_len)?;
-    if !after.is_alphanumeric() {
-        return None;
-    }
-
-    Some(run_len)
-}
-
-fn is_task_checkbox_inline_start_boundary_ok(nodes: &[Node], fragment: &str) -> bool {
+fn is_task_checkbox_inline_start_boundary_ok(items: &[Item], fragment: &str) -> bool {
     if !fragment.starts_with('[') {
         return false;
     }
 
     // If the previous emitted character is alphanumeric/underscore, we do not
     // treat `[x]` / `[ ]` as a task marker (avoid matching `word[x]`).
-    match last_emitted_char(nodes) {
+    match last_emitted_char(items) {
         None => true,
         Some(prev) => !(prev.is_alphanumeric() || prev == '_'),
     }
 }
 
-fn last_emitted_char(nodes: &[Node]) -> Option<char> {
-    nodes.iter().rev().find_map(last_char_in_node)
-}
-
-fn last_char_in_node(node: &Node) -> Option<char> {
-    match &node.kind {
-        NodeKind::Text(t) => t.chars().last(),
-        // Formatting/container nodes: use their last child.
-        _ => node.children.iter().rev().find_map(last_char_in_node),
-    }
+fn last_emitted_char(items: &[Item]) -> Option<char> {
+    items.iter().rev().find_map(|item| item.last_char())
 }
 
 /// Parse inline elements within text content (backward compatibility wrapper)

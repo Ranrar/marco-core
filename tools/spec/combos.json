@@ -61,13 +61,13 @@
   },
   {
     "markdown": "***hello***",
-    "html": "<p><strong><em>hello</em></strong></p>\n",
+    "html": "<p><em><strong>hello</strong></em></p>\n",
     "example": 4011,
     "section": "Bold and italic"
   },
   {
     "markdown": "___hello___",
-    "html": "<p><strong><em>hello</em></strong></p>\n",
+    "html": "<p><em><strong>hello</strong></em></p>\n",
     "example": 4012,
     "section": "Bold and italic"
   },
@@ -97,7 +97,7 @@
   },
   {
     "markdown": "***bold italic** then italic*",
-    "html": "<p><strong>*bold italic</strong> then italic*</p>\n",
+    "html": "<p><em><strong>bold italic</strong> then italic</em></p>\n",
     "example": 4017,
     "section": "Bold and italic"
   },
@@ -139,7 +139,7 @@
   },
   {
     "markdown": "[***wow***](https://example.com)",
-    "html": "<p><a href=\"https://example.com\"><strong><em>wow</em></strong></a></p>\n",
+    "html": "<p><a href=\"https://example.com\"><em><strong>wow</strong></em></a></p>\n",
     "example": 4024,
     "section": "Inlines in link"
   },
@@ -445,7 +445,7 @@
   },
   {
     "markdown": "_leading_underscore",
-    "html": "<p><em>leading</em>underscore</p>\n",
+    "html": "<p>_leading_underscore</p>\n",
     "example": 4075,
     "section": "Intraword underscore"
   },

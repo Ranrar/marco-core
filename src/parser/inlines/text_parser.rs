@@ -34,22 +34,32 @@ use nom::Parser;
 pub fn parse_text(input: GrammarSpan) -> IResult<GrammarSpan, Node> {
     let text_fragment = input.fragment();
 
+    // Autolink literals, emoji shortcodes, and platform mentions are all
+    // single-line constructs, so bound their lookahead scans to the current
+    // line instead of the entire remaining document. Without this bound,
+    // each of the three `find_next_*_start` helpers below does an unbounded
+    // substring search to the end of `text_fragment` (which shrinks by only
+    // one small chunk per `parse_text` call), making a large multi-line
+    // paragraph with no matches anywhere cost O(n^2) instead of O(n).
+    let line_end = text_fragment.find('\n').unwrap_or(text_fragment.len());
+    let line = &text_fragment[..line_end];
+
     // GFM autolink literals can appear in the middle of a text node.
     // If we can see a valid autolink literal starting at some offset, we must
     // stop before it so the dedicated parser can run.
     let next_autolink_literal =
-        super::gfm_autolink_literal_parser::find_next_autolink_literal_start(text_fragment)
+        super::gfm_autolink_literal_parser::find_next_autolink_literal_start(line)
             .unwrap_or(text_fragment.len());
 
     // Emoji shortcodes (extended syntax) can appear in the middle of a text node.
     // Only stop for *recognized* shortcodes; unknown ones remain literal.
     let next_emoji_shortcode =
-        super::marco_emoji_shortcode_parser::find_next_emoji_shortcode_start(text_fragment)
+        super::marco_emoji_shortcode_parser::find_next_emoji_shortcode_start(line)
             .unwrap_or(text_fragment.len());
 
     // Platform mentions (extended syntax) can appear in the middle of a text node.
     let next_platform_mention =
-        super::marco_platform_mentions_parser::find_next_platform_mention_start(text_fragment)
+        super::marco_platform_mentions_parser::find_next_platform_mention_start(line)
             .unwrap_or(text_fragment.len());
 
     // Find the next special character / delimiter start.

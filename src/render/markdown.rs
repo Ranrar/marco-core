@@ -350,12 +350,13 @@ fn render_node(
             output.push_str("</strong>");
         }
         NodeKind::StrongEmphasis => {
-            // Triple delimiter: bold + italic.
-            output.push_str("<strong><em>");
+            // Triple delimiter: emphasis wrapping strong, e.g. `***foo***` ->
+            // `<em><strong>foo</strong></em>` (CommonMark spec example 467).
+            output.push_str("<em><strong>");
             for child in &node.children {
                 render_node(child, output, options, ctx)?;
             }
-            output.push_str("</em></strong>");
+            output.push_str("</strong></em>");
         }
         NodeKind::Strikethrough => {
             output.push_str("<del>");
@@ -1431,7 +1432,7 @@ mod tests {
 
         let options = RenderOptions::default();
         let result = render_html(&doc, &options).unwrap();
-        assert_eq!(result, "<p><strong><em>bold+italic</em></strong></p>\n");
+        assert_eq!(result, "<p><em><strong>bold+italic</strong></em></p>\n");
     }
 
     #[test]

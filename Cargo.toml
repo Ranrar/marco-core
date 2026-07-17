@@ -52,6 +52,7 @@ file-logger = []
 # Core parsing dependencies (nom-based)
 nom = "8.0.0"
 nom_locate = "5.0.0"
+unicode-general-category = "1.1.0"
 
 # Serialization
 ron = "0.12.0"
