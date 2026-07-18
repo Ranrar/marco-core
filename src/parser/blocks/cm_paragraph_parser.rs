@@ -23,7 +23,11 @@ use nom::Input;
 /// 3. Falls back to plain text on inline parsing errors
 ///
 /// # Example
-/// ```ignore
+/// ```
+/// use marco_core::parser::blocks::cm_paragraph_parser::parse_paragraph;
+/// use marco_core::parser::shared::GrammarSpan;
+/// use marco_core::NodeKind;
+///
 /// let content = GrammarSpan::new("This is **bold** text.");
 /// let node = parse_paragraph(content);
 /// assert!(matches!(node.kind, NodeKind::Paragraph));
@@ -73,6 +77,58 @@ pub fn parse_paragraph(content: GrammarSpan) -> Node {
         span,
         children: inline_children,
     }
+}
+
+/// Like [`parse_paragraph`], but instead of inline-parsing immediately,
+/// returns the paragraph's shape (span, no children yet) alongside the
+/// ordered list of segments needed to fill `children` in later — so the
+/// actual inline parsing can be deferred and batched with other paragraphs
+/// under the `parallel-parse` feature. See `super::parallel_inline` for why
+/// this is structured as segments rather than a single span: paragraphs can
+/// interleave literal `TaskCheckboxInline` nodes with spans of text that
+/// still need inline parsing.
+#[cfg(feature = "parallel-parse")]
+pub(crate) fn parse_paragraph_shape(
+    content: GrammarSpan<'_>,
+) -> (Node, Vec<super::parallel_inline::Segment<'_>>) {
+    use super::parallel_inline::{PendingSpan, Segment};
+
+    let span = opt_span(content);
+    let mut segments: Vec<Segment<'_>> = Vec::new();
+    let mut remaining = content;
+
+    while let Some((start, checked, consumed)) =
+        find_next_task_checkbox_marker(remaining.fragment())
+    {
+        if start > 0 {
+            let (rest, prefix) = remaining.take_split(start);
+            if !prefix.fragment().is_empty() {
+                segments.push(Segment::Pending(PendingSpan::Borrowed(prefix)));
+            }
+            remaining = rest;
+        }
+
+        let (after_marker, _marker_taken) = remaining.take_split(consumed);
+        segments.push(Segment::Literal(Node {
+            kind: NodeKind::TaskCheckboxInline { checked },
+            span: crate::parser::shared::opt_span_range(remaining, after_marker),
+            children: Vec::new(),
+        }));
+        remaining = after_marker;
+    }
+
+    if !remaining.fragment().is_empty() {
+        segments.push(Segment::Pending(PendingSpan::Borrowed(remaining)));
+    }
+
+    (
+        Node {
+            kind: NodeKind::Paragraph,
+            span,
+            children: Vec::new(),
+        },
+        segments,
+    )
 }
 
 fn parse_inlines_or_fallback_text(input: GrammarSpan) -> Vec<Node> {

@@ -26,6 +26,6 @@ pub use blocks::{
 
 // Re-export all inline grammar functions
 pub use inlines::{
-    autolink, backslash_escape, code_span, display_math, emphasis, hard_line_break, image,
-    inline_html, inline_math, link, soft_line_break, strong,
+    autolink, backslash_escape, code_span, display_math, hard_line_break, image, inline_html,
+    inline_math, link, soft_line_break,
 };

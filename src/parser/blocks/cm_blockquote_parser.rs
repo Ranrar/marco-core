@@ -24,9 +24,15 @@ use crate::parser::ast::{Document, Node, NodeKind};
 /// 4. Recursively parses the cleaned content as block elements
 ///
 /// # Example
-/// ```ignore
+/// ```
+/// use marco_core::parser::blocks::cm_blockquote_parser::parse_blockquote;
+/// use marco_core::parser::shared::GrammarSpan;
+/// use marco_core::{Document, NodeKind};
+///
 /// let content = GrammarSpan::new("> Line 1\n> Line 2");
-/// let node = parse_blockquote(content, 0, parse_blocks_internal);
+/// let node = parse_blockquote(content, 0, |_input: &str, _depth: usize| {
+///     Ok(Document::new())
+/// }).unwrap();
 /// assert!(matches!(node.kind, NodeKind::Blockquote));
 /// ```
 pub fn parse_blockquote<F>(

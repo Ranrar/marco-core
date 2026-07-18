@@ -18,10 +18,13 @@ use nom::{
 /// The LaTeX content span (without the `$` delimiters).
 ///
 /// # Example
-/// ```ignore
+/// ```
+/// use marco_core::grammar::{inline_math, Span};
+///
 /// let input = Span::new("$x^2 + y^2 = r^2$ text");
 /// let (rest, content) = inline_math(input).unwrap();
 /// assert_eq!(*content.fragment(), "x^2 + y^2 = r^2");
+/// assert_eq!(*rest.fragment(), " text");
 /// ```
 pub fn inline_math(input: Span) -> IResult<Span, Span> {
     log::debug!("Parsing inline math at: {:?}", input.fragment());

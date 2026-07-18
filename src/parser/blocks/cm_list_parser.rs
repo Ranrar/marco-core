@@ -38,12 +38,21 @@ pub trait ListParserState {
 /// 5. Returns complete list node with all item children
 ///
 /// # Example
-/// ```ignore
-/// let items = vec![
-///     (ListMarker::Bullet('-'), content_span, false, false, 2),
-///     (ListMarker::Bullet('-'), content_span2, false, false, 2),
-/// ];
-/// let node = parse_list(items, 0, parse_fn, state_fn).unwrap();
+/// ```
+/// use marco_core::grammar::ListMarker;
+/// use marco_core::parser::blocks::cm_list_parser::parse_list;
+/// use marco_core::parser::shared::GrammarSpan;
+/// use marco_core::{Document, NodeKind};
+///
+/// let content = GrammarSpan::new("item 1");
+/// let items = vec![(ListMarker::Bullet('-'), content, false, false, 2)];
+/// let node = parse_list(
+///     items,
+///     0,
+///     |_input: &str, _depth: usize, _state: &mut ()| Ok(Document::new()),
+///     |_indent: usize| (),
+/// )
+/// .unwrap();
 /// assert!(matches!(node.kind, NodeKind::List { .. }));
 /// ```
 pub fn parse_list<F, S, G>(

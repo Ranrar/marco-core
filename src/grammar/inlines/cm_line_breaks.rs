@@ -22,7 +22,9 @@ use nom::{
 /// Unit `()` indicating a soft line break was found.
 ///
 /// # Example
-/// ```ignore
+/// ```
+/// use marco_core::grammar::{soft_line_break, Span};
+///
 /// let input = Span::new("\nmore text");
 /// let (rest, _) = soft_line_break(input).unwrap();
 /// assert_eq!(*rest.fragment(), "more text");
@@ -45,9 +47,12 @@ pub fn soft_line_break(input: Span) -> IResult<Span, ()> {
 /// Unit `()` indicating a hard line break was found.
 ///
 /// # Example
-/// ```ignore
+/// ```
+/// use marco_core::grammar::{hard_line_break, Span};
+///
 /// let input = Span::new("  \nmore text");
 /// let (rest, _) = hard_line_break(input).unwrap();
+/// assert_eq!(*rest.fragment(), "more text");
 /// ```
 pub fn hard_line_break(input: Span) -> IResult<Span, ()> {
     log::debug!("Parsing hard line break");

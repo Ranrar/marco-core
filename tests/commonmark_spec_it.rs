@@ -40,8 +40,10 @@ use serde::Deserialize;
 
 /// Minimum number of CommonMark examples (out of 652) that must pass
 /// strict HTML comparison. Bump upward as conformance improves; never lower
-/// without a documented reason. Current measured baseline: 285.
-const MIN_COMMONMARK_PASS: usize = 280;
+/// without a documented reason. Current measured baseline: 357 (up from 285
+/// after replacing the emphasis/strong scan-and-retry matching with the
+/// CommonMark delimiter-stack algorithm — see .dev/parser-render-optimization-plan.md).
+const MIN_COMMONMARK_PASS: usize = 350;
 
 #[derive(Debug, Deserialize)]
 struct RawEntry {

@@ -15,9 +15,11 @@ use nom::{character::complete::char, IResult};
 /// The escaped character (without the backslash).
 ///
 /// # Example
-/// ```ignore
+/// ```
+/// use marco_core::grammar::{backslash_escape, Span};
+///
 /// let input = Span::new("\\*");
-/// let (rest, ch) = backslash_escape(input).unwrap();
+/// let (_rest, ch) = backslash_escape(input).unwrap();
 /// assert_eq!(ch, '*');
 /// ```
 pub fn backslash_escape(input: Span) -> IResult<Span, char> {

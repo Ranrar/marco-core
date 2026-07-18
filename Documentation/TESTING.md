@@ -22,13 +22,22 @@ MARCO_SPEC_VERBOSE=1 cargo test --test commonmark_spec_it --locked
 
 | Layer | Location | What it tests |
 |---|---|---|
-| Unit / smoke | `src/**/mod.rs` (`#[cfg(test)]`) | Module internals |
-| Integration | `tests/*.rs` | Public API surface (93 tests across 23 files) |
+| Unit / smoke | `src/**/mod.rs` (`#[cfg(test)]`) | Module internals (518 tests) |
+| Integration | `tests/*.rs` | Public API surface (103 tests across 23 files, default features) |
 | Spec conformance | `tests/commonmark_spec_it.rs` | CommonMark + extensions (652 examples + 30+ extension cases) |
 | Extension specs | `tools/tests/extension_spec_it.rs` | GFM / Marco / Math / Diagram cases (5 suites) |
-| Doc tests | `///` comments | Rustdoc examples |
+| Doc tests | `///` comments | Rustdoc examples (31 run, 0 `no_run`/`ignore`) |
 
-**Total: ~720 tests**, all passing.
+**Total: 657 `cargo test` tests** (518 unit + 103 integration + 5 extension-spec +
+31 doc), all passing — plus the 652 CommonMark spec examples and extension
+fixture cases checked *within* those test functions (not separate `cargo
+test` tests, see "CommonMark conformance" below). One integration file,
+`tests/parallel_parse_it.rs` (9 tests), plus 4 unit tests colocated in
+`src/parser/blocks/parallel_inline.rs`, are gated `#![cfg(feature =
+"parallel-parse")]`, which is on by default — the 103/657 figures above
+already include them. Building with `--no-default-features` and
+re-enabling every default feature except `parallel-render`/`parallel-parse`
+drops the total to 644.
 
 ## Spec fixtures
 
@@ -53,9 +62,9 @@ The `commonmark_spec_it` test runs two variants:
 
 Each of 652 spec examples: `parse(md) → render() → assert_eq!(html)`.
 
-**Current baseline: 285 / 652 ≈ 43.7%** (regression-guarded).
+**Current baseline: 357 / 652 ≈ 54.8%** (regression-guarded).
 
-This is the real conformance number. The rest (357) are near-misses:
+This is the real conformance number. The rest (295) are near-misses:
 the parser produces the right structure but with formatting differences
 (whitespace, entity escaping, attribute order, etc.).
 
@@ -71,12 +80,12 @@ Checks only if the same set of block-level tags (`<h1>`...`<h6>`, `<p>`,
 Tests assert **floors**, not exact values:
 
 ```rust
-const MIN_COMMONMARK_PASS: usize = 280;  // current: 285
+const MIN_COMMONMARK_PASS: usize = 350;  // current: 357
 let min_structural_pct = 97.0;           // current: 98.8%
 ```
 
-Why? Small intentional formatting tweaks (285 → 288) don't break the test.
-Actual regressions (285 → 235) do fail. When conformance improves, raise
+Why? Small intentional formatting tweaks (357 → 360) don't break the test.
+Actual regressions (357 → 300) do fail. When conformance improves, raise
 the constant — never lower it without a documented reason.
 
 ## Adding tests
@@ -100,7 +109,9 @@ the constant — never lower it without a documented reason.
 
 ## Test inventory
 
-**Integration tests:** 93 total across 23 files under `tests/`:
+**Integration tests:** 103 total across 23 files under `tests/` (default
+features, which include `parallel-parse`; drops to 94 under
+`--no-default-features`, see note above):
 
 | File | Count | Coverage |
 |---|---:|---|
@@ -110,7 +121,7 @@ the constant — never lower it without a documented reason.
 | `definition_lists_it.rs` | 4 | Headerless definition lists |
 | `gfm_admonitions_it.rs` | 5 | Alert blocks (`> [!NOTE]`) |
 | `gfm_autolinks_it.rs` | 8 | Bare URLs and email autolinks |
-| `gfm_footnotes_it.rs` | 3 | Footnote references and definitions |
+| `gfm_footnotes_it.rs` | 5 | Footnote references and definitions |
 | `gfm_tables_it.rs` | 4 | Pipe tables with alignment |
 | `gfm_tasklist_it.rs` | 6 | Task list checkboxes |
 | `heading_anchor_links_it.rs` | 2 | Custom heading IDs |
@@ -121,9 +132,10 @@ the constant — never lower it without a documented reason.
 | `intelligence_provider_it.rs` | 6 | MarkdownIntelligenceProvider features |
 | `marco_emoji_shortcode_it.rs` | 5 | Emoji shortcodes (`:smile:`) |
 | `marco_headerless_table_it.rs` | 2 | Headerless tables |
-| `marco_inline_footnotes_it.rs` | 4 | Inline footnotes |
+| `marco_inline_footnotes_it.rs` | 6 | Inline footnotes |
 | `marco_sliders_it.rs` | 3 | Slider blocks (`@slidestart` / `@slideend`) |
 | `marco_tab_blocks_it.rs` | 3 | Tab blocks (`:::tab` / `@tab`) |
+| `parallel_parse_it.rs` | 9 | Deferred inline-parse parity (skipped under `--no-default-features`) |
 | `platform_mentions_it.rs` | 3 | Platform mentions (`@user[github]`) |
 | `sanitize_input_it.rs` | 4 | UTF-8 sanitization |
 

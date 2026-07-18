@@ -10,10 +10,14 @@ use nom::IResult;
 /// Parse a display math expression `$$...$$` to a DisplayMath AST node.
 ///
 /// # Example
-/// ```ignore
+/// ```
+/// use marco_core::parser::inlines::math_display_parser::parse_display_math;
+/// use marco_core::parser::shared::GrammarSpan;
+/// use marco_core::NodeKind;
+///
 /// let input = GrammarSpan::new("$$\\int x^2 dx$$ text");
-/// let (rest, node) = parse_display_math(input).unwrap();
-/// // node.kind == NodeKind::DisplayMath { content: "\\int x^2 dx" }
+/// let (_rest, node) = parse_display_math(input).unwrap();
+/// assert!(matches!(node.kind, NodeKind::DisplayMath { content } if content == "\\int x^2 dx"));
 /// ```
 pub fn parse_display_math(input: GrammarSpan) -> IResult<GrammarSpan, Node> {
     let (rest, content_span) = display_math(input)?;

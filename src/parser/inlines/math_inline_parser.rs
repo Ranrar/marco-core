@@ -10,10 +10,14 @@ use nom::IResult;
 /// Parse an inline math expression `$...$` to an InlineMath AST node.
 ///
 /// # Example
-/// ```ignore
+/// ```
+/// use marco_core::parser::inlines::math_inline_parser::parse_inline_math;
+/// use marco_core::parser::shared::GrammarSpan;
+/// use marco_core::NodeKind;
+///
 /// let input = GrammarSpan::new("$E = mc^2$ text");
-/// let (rest, node) = parse_inline_math(input).unwrap();
-/// // node.kind == NodeKind::InlineMath { content: "E = mc^2" }
+/// let (_rest, node) = parse_inline_math(input).unwrap();
+/// assert!(matches!(node.kind, NodeKind::InlineMath { content } if content == "E = mc^2"));
 /// ```
 pub fn parse_inline_math(input: GrammarSpan) -> IResult<GrammarSpan, Node> {
     let (rest, content_span) = inline_math(input)?;

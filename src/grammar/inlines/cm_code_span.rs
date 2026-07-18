@@ -19,9 +19,11 @@ use nom::{
 /// The content span between the backticks (without the backticks themselves).
 ///
 /// # Example
-/// ```ignore
+/// ```
+/// use marco_core::grammar::{code_span, Span};
+///
 /// let input = Span::new("`code` text");
-/// let (rest, content) = code_span(input).unwrap();
+/// let (_rest, content) = code_span(input).unwrap();
 /// assert_eq!(*content.fragment(), "code");
 /// ```
 pub fn code_span(input: Span) -> IResult<Span, Span> {

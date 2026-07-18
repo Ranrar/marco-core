@@ -40,6 +40,9 @@ pub fn run(_ctx: &AppContext, opts: &RegressionOptions) -> Result<(), Box<dyn st
     if opts.critical_only {
         println!("  scope    : critical workloads only");
     }
+    if let Some(mode) = opts.mode {
+        println!("  mode     : {} only", format!("{mode:?}").to_lowercase());
+    }
     println!();
 
     let mut results: Vec<RegressionResult> = Vec::new();
@@ -48,6 +51,12 @@ pub fn run(_ctx: &AppContext, opts: &RegressionOptions) -> Result<(), Box<dyn st
         // Skip records not relevant to gating scope
         if opts.critical_only && !is_critical(cur) {
             continue;
+        }
+
+        if let Some(mode) = opts.mode {
+            if cur.mode != format!("{mode:?}").to_lowercase() {
+                continue;
+            }
         }
 
         // Find matching baseline record (same engine + workload + mode)
@@ -152,6 +161,22 @@ pub fn run(_ctx: &AppContext, opts: &RegressionOptions) -> Result<(), Box<dyn st
     Ok(())
 }
 
+/// Workloads that gate the build on their own (see `--critical-only`),
+/// without needing 2+ other regressions to also trip the broad gate.
+///
+/// Two mechanisms, both honored: (1) the generic "tag it yourself" escape
+/// hatch — anything with "critical" in its id or profile — for future use;
+/// (2) an explicit, permanent list naming exactly the workload categories
+/// `.dev/parser-render-optimization-plan.md` targets — `spec:commonmark`
+/// (the full CommonMark conformance suite) and every fixture under
+/// `fixture:pathological:*` (adversarial/degenerate input). These are the
+/// two categories Phases 1-2 of that plan brought down from ~70-212x
+/// slower than comparable engines to within a few x; regressing either
+/// back toward that territory should fail a PR by itself, not need a
+/// second, unrelated workload to also regress.
 fn is_critical(rec: &BenchRecord) -> bool {
-    rec.profile.contains("critical") || rec.workload_id.contains("critical")
+    rec.profile.contains("critical")
+        || rec.workload_id.contains("critical")
+        || rec.workload_id == "spec:commonmark"
+        || rec.workload_id.starts_with("fixture:pathological:")
 }

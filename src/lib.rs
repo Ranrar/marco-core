@@ -38,6 +38,13 @@ pub use parser::parse_with_options;
 pub use parser::ParseOptions;
 /// Core AST types used by parser, renderer, and intelligence modules.
 pub use parser::{Document, Node, NodeKind};
+/// Eagerly warm `parallel-render`'s thread pool and, for each given
+/// language, its syntax highlighter — call at application startup with your
+/// expected languages to move most of that one-time cost off the first
+/// render. A no-op when `parallel-render` is not compiled in, so it's always
+/// safe to call. See [`render::warm_render_thread_pool`] for details,
+/// including which part of the cost this can and can't eliminate.
+pub use render::warm_render_thread_pool;
 /// Render a parsed [`Document`] into HTML using [`RenderOptions`].
 pub use render::{render, RenderOptions};
 

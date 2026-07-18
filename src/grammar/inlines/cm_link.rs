@@ -14,26 +14,35 @@ pub fn link(input: Span) -> IResult<Span, (Span, Span, Option<Span>)> {
         )));
     }
     // Find the matching `]` respecting nested bracket pairs (e.g. `[![img](url)]`).
-    let bracket_pos = {
-        let mut depth = 0usize;
-        let mut found = None;
-        let inner = &content_str[1..];
-        for (i, c) in inner.char_indices() {
-            match c {
-                '[' => {
-                    depth += 1;
-                }
-                ']' => {
-                    if depth == 0 {
-                        found = Some(i);
-                        break;
+    // Consult the precomputed cache first (see `bracket_match` module docs) —
+    // this is what keeps repeated retries at successive `[` positions
+    // linear instead of quadratic. Falls back to a live scan when no cache
+    // is installed (e.g. calling this function directly, as the unit tests
+    // below do).
+    let open_abs = input.location_offset();
+    let bracket_pos = match super::bracket_match::cached_naive_nested_match(open_abs) {
+        Some(cached) => cached.map(|close_abs| close_abs - open_abs - 1),
+        None => {
+            let mut depth = 0usize;
+            let mut found = None;
+            let inner = &content_str[1..];
+            for (i, c) in inner.char_indices() {
+                match c {
+                    '[' => {
+                        depth += 1;
                     }
-                    depth -= 1;
+                    ']' => {
+                        if depth == 0 {
+                            found = Some(i);
+                            break;
+                        }
+                        depth -= 1;
+                    }
+                    _ => {}
                 }
-                _ => {}
             }
+            found
         }
-        found
     };
     let bracket_pos = bracket_pos.ok_or_else(|| {
         nom::Err::Error(nom::error::Error::new(
