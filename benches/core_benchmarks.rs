@@ -12,14 +12,10 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use std::hint::black_box;
 
-const SMALL: &str =
-    include_str!("../tools/perf-lab/fixtures/small/generated-synthetic.md");
-const MEDIUM: &str =
-    include_str!("../tools/perf-lab/fixtures/medium/generated-synthetic.md");
-const LARGE: &str =
-    include_str!("../tools/perf-lab/fixtures/large/generated-synthetic.md");
-const STAR_PYRAMID: &str =
-    include_str!("../tools/perf-lab/fixtures/pathological/star-pyramid.md");
+const SMALL: &str = include_str!("../tools/perf-lab/fixtures/small/generated-synthetic.md");
+const MEDIUM: &str = include_str!("../tools/perf-lab/fixtures/medium/generated-synthetic.md");
+const LARGE: &str = include_str!("../tools/perf-lab/fixtures/large/generated-synthetic.md");
+const STAR_PYRAMID: &str = include_str!("../tools/perf-lab/fixtures/pathological/star-pyramid.md");
 const UNBALANCED_BRACKETS: &str =
     include_str!("../tools/perf-lab/fixtures/pathological/unbalanced-brackets.md");
 
