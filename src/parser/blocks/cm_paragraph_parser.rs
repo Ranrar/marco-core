@@ -23,7 +23,11 @@ use nom::Input;
 /// 3. Falls back to plain text on inline parsing errors
 ///
 /// # Example
-/// ```ignore
+/// ```
+/// use marco_core::parser::blocks::cm_paragraph_parser::parse_paragraph;
+/// use marco_core::parser::shared::GrammarSpan;
+/// use marco_core::NodeKind;
+///
 /// let content = GrammarSpan::new("This is **bold** text.");
 /// let node = parse_paragraph(content);
 /// assert!(matches!(node.kind, NodeKind::Paragraph));

@@ -48,11 +48,13 @@ paragraph with no matches.
 
 ### Added
 
-#### Opt-in multi-core parallelism (`parallel-render`, `parallel-parse`)
+#### Multi-core parallelism (`parallel-render`, `parallel-parse`)
 
-Two new Cargo features, both **off by default** (they pull in `rayon`, a
-real OS thread pool, so they're excluded from targets that don't want
-threads — e.g. plain `wasm32-unknown-unknown`):
+Two new Cargo features, both **on by default** (they pull in `rayon`, a
+real OS thread pool; targets that don't want threads — e.g. plain
+`wasm32-unknown-unknown` — should build with `default-features = false`
+and re-enable every other default feature explicitly, see README "Feature
+flags"):
 
 - `parallel-render` fans out per-code-block syntax highlighting across
   cores at render time. On a 16-core machine, a code-block-heavy document
@@ -66,7 +68,7 @@ threads — e.g. plain `wasm32-unknown-unknown`):
   parallelizing it naively regressed list-heavy documents by ~28%.
 
 Both produce byte-for-byte HTML / AST-identical output to the sequential
-path — this is purely a performance opt-in, not a behavior change. Also
+path — a pure performance toggle, not a behavior change. Also
 added: `warm_render_thread_pool(languages: &[&str])`, re-exported at the
 crate root, lets an embedder pre-pay `parallel-render`'s one-time
 thread-pool and per-language syntax-highlighter warm-up cost at a time of

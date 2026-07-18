@@ -32,6 +32,8 @@ default = [
     "render-math",
     "render-diagrams",
     "file-logger",
+    "parallel-render",
+    "parallel-parse",
 ]
 
 # Intelligence layer features — gate editor analysis code
@@ -45,19 +47,9 @@ render-syntax-highlighting = ["dep:syntect"]
 render-math                = ["dep:katex-rs"]
 render-diagrams            = ["dep:mermaid-rs-renderer"]
 
-# Parallel rendering: fan out per-code-block syntax highlighting across
-# cores with rayon. Off by default (not in the `default` list above) since
-# it pulls in a real OS thread pool, which isn't available/desired on every
-# target (e.g. plain wasm32-unknown-unknown embeds). No effect unless
-# `render-syntax-highlighting` is also enabled.
+# Parallel rendering and parsing
 parallel-render = ["dep:rayon"]
-
-# Parallel parsing: fan out inline parsing of independent block content
-# (paragraphs, table cells, definition terms, footnote-definition bodies)
-# across cores with rayon, after block boundaries are found sequentially.
-# Off by default, same reasoning as `parallel-render`. Independent of that
-# feature — either alone pulls in `dep:rayon`.
-parallel-parse = ["dep:rayon"]
+parallel-parse  = ["dep:rayon"]
 
 # Runtime utilities
 file-logger = []

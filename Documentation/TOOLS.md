@@ -199,13 +199,15 @@ All scripts accept `--release` as the first argument.
 
 **`run-parallel-compare.sh`** — `parallel-render`/`parallel-parse` are
 compile-time Cargo features, so no single perf-lab binary can toggle them
-per-run (`bench` has no `--features` flag). This script builds perf-lab
-twice — once with both features off, once with `--features
-marco-core/parallel-render,marco-core/parallel-parse` — runs the same
-`bench` invocation against each binary, and feeds the two `BenchRecord`
-artifacts into `regression` as the diff engine, which already matches
-records by `(engine, workload_id, mode)` and prints a %-change table (no new
-report format needed). By default the gate thresholds are set high enough
+per-run (`bench` has no `--features` flag). Both are on by default, so
+this script builds perf-lab twice — once with
+`--no-default-features` plus every other default feature re-enabled
+explicitly (the "sequential" binary), once with plain crate defaults (the
+"parallel" binary, since that's what defaults already give you) — runs the
+same `bench` invocation against each binary, and feeds the two
+`BenchRecord` artifacts into `regression` as the diff engine, which already
+matches records by `(engine, workload_id, mode)` and prints a %-change table
+(no new report format needed). By default the gate thresholds are set high enough
 that it never fails/warns — it's a report, not a CI gate, since most
 workloads are expected to be ~unchanged (`parallel-parse` only defers
 `depth == 0` top-level content; `parallel-render` only helps

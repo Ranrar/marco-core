@@ -22,21 +22,22 @@ MARCO_SPEC_VERBOSE=1 cargo test --test commonmark_spec_it --locked
 
 | Layer | Location | What it tests |
 |---|---|---|
-| Unit / smoke | `src/**/mod.rs` (`#[cfg(test)]`) | Module internals (513 tests) |
-| Integration | `tests/*.rs` | Public API surface (94 tests across 23 files, default features) |
+| Unit / smoke | `src/**/mod.rs` (`#[cfg(test)]`) | Module internals (518 tests) |
+| Integration | `tests/*.rs` | Public API surface (103 tests across 23 files, default features) |
 | Spec conformance | `tests/commonmark_spec_it.rs` | CommonMark + extensions (652 examples + 30+ extension cases) |
 | Extension specs | `tools/tests/extension_spec_it.rs` | GFM / Marco / Math / Diagram cases (5 suites) |
-| Doc tests | `///` comments | Rustdoc examples (13 run, 18 `no_run`/`ignore`) |
+| Doc tests | `///` comments | Rustdoc examples (31 run, 0 `no_run`/`ignore`) |
 
-**Total: 625 `cargo test` tests** (513 unit + 94 integration + 5 extension-spec +
-13 doc), all passing — plus the 652 CommonMark spec examples and extension
+**Total: 657 `cargo test` tests** (518 unit + 103 integration + 5 extension-spec +
+31 doc), all passing — plus the 652 CommonMark spec examples and extension
 fixture cases checked *within* those test functions (not separate `cargo
 test` tests, see "CommonMark conformance" below). One integration file,
-`tests/parallel_parse_it.rs` (9 tests), plus 3 unit tests colocated in
+`tests/parallel_parse_it.rs` (9 tests), plus 4 unit tests colocated in
 `src/parser/blocks/parallel_inline.rs`, are gated `#![cfg(feature =
-"parallel-parse")]` and contribute 0 under default features — the 94/625
-figures above are the default-feature count;
-`cargo test --features parallel-parse` runs 637.
+"parallel-parse")]`, which is on by default — the 103/657 figures above
+already include them. Building with `--no-default-features` and
+re-enabling every default feature except `parallel-render`/`parallel-parse`
+drops the total to 644.
 
 ## Spec fixtures
 
@@ -108,9 +109,9 @@ the constant — never lower it without a documented reason.
 
 ## Test inventory
 
-**Integration tests:** 94 total across 23 files under `tests/` (default
-features; `parallel_parse_it.rs` adds 9 more under `--features
-parallel-parse`, see note above):
+**Integration tests:** 103 total across 23 files under `tests/` (default
+features, which include `parallel-parse`; drops to 94 under
+`--no-default-features`, see note above):
 
 | File | Count | Coverage |
 |---|---:|---|
@@ -134,7 +135,7 @@ parallel-parse`, see note above):
 | `marco_inline_footnotes_it.rs` | 6 | Inline footnotes |
 | `marco_sliders_it.rs` | 3 | Slider blocks (`@slidestart` / `@slideend`) |
 | `marco_tab_blocks_it.rs` | 3 | Tab blocks (`:::tab` / `@tab`) |
-| `parallel_parse_it.rs` | 0 / 9 | Deferred inline-parse parity (requires `--features parallel-parse`) |
+| `parallel_parse_it.rs` | 9 | Deferred inline-parse parity (skipped under `--no-default-features`) |
 | `platform_mentions_it.rs` | 3 | Platform mentions (`@user[github]`) |
 | `sanitize_input_it.rs` | 4 | UTF-8 sanitization |
 

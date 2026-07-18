@@ -113,22 +113,25 @@ Release build, 50-iteration mean:
 
 | Input size | Parse | Render | End-to-end |
 |---|---|---|---|
-| ~1 KB | 59 µs | 16 µs | 75 µs |
-| ~10 KB | 643 µs | 156 µs | 799 µs |
-| ~100 KB | 7.7 ms | 1.5 ms | 9.2 ms |
+| Small (75 B) | 7.3 µs | 2.2 µs | 9.3 µs |
+| Medium (1.9 KB) | 126 µs | 33 µs | 154 µs |
+| Large (37 KB) | 2.25 ms | 0.56 ms | 2.79 ms |
 
 Suitable for interactive editors and real-time linting. On adversarial/pathological
-input (deeply nested emphasis, unbalanced brackets) marco-core previously fell off
-an algorithmic cliff (up to ~200x slower than comparable engines); as of this
-release it stays within a small constant factor even on those inputs — see
-[`PERFORMANCE_OPTIMIZATION_REVIEW.md`](PERFORMANCE_OPTIMIZATION_REVIEW.md) for
-the full cross-engine comparison and methodology. Opt-in `parallel-render` and
-`parallel-parse` features (off by default) add further multi-core speedups for
-code-block-heavy and flat/wide documents — see [Feature flags](#feature-flags).
+input (deeply nested emphasis, unbalanced brackets) marco-core stays within a small
+constant factor of comparable engines rather than falling off an algorithmic cliff:
+measured (marco-core mean ÷ other-engine mean, 20-iteration e2e) at 2.25x/2.32x
+against pulldown-cmark/comrak on the full `spec:commonmark` suite, and 11.4x/9.1x
+(star-pyramid) / 5.0x/1.5x (unbalanced-brackets) on the two dedicated pathological
+fixtures — see [`tools/perf-lab`](tools/perf-lab/README.md) for the benchmarking
+harness and how to reproduce these numbers. `parallel-render` and
+`parallel-parse` (on by default) add further multi-core speedups for
+code-block-heavy and flat/wide documents — see [Feature flags](#feature-flags)
+to disable them.
 
 ## Feature flags
 
-8 flags are on by default. Use `default-features = false` to slim the build:
+10 flags are on by default. Use `default-features = false` to slim the build:
 
 ```toml
 marco-core = { version = "1.3", default-features = false, features = ["render-syntax-highlighting"] }
@@ -144,22 +147,28 @@ marco-core = { version = "1.3", default-features = false, features = ["render-sy
 | `intelligence-diagnostics` | Linting and diagnostics |
 | `intelligence-completions` | Autocompletion |
 | `intelligence-hover` | Hover information |
-
-A `--no-default-features` build still includes parse + basic render.
-
-Two further flags are **off by default** (opt-in only, not part of the 8 above)
-— both pull in `rayon` for a real OS thread pool, so they're excluded from
-`default` for WASM/embedded targets that don't want threads:
-
-| Flag | Enables |
-|---|---|
 | `parallel-render` | Fan out per-code-block syntax highlighting across cores at render time |
 | `parallel-parse` | Fan out inline parsing of independent top-level blocks (paragraphs, table cells, definition terms, footnote bodies) across cores |
 
-Both produce byte-for-byte/AST-identical output to the sequential path —
-purely a performance opt-in. Call `warm_render_thread_pool(&["rust", "python"])`
-at application startup to pre-pay `parallel-render`'s one-time thread-pool and
-syntax-highlighter warm-up cost (a no-op when the feature isn't compiled in).
+A `--no-default-features` build still includes parse + basic render.
+
+`parallel-render` and `parallel-parse` pull in `rayon` for a real OS thread
+pool. Both produce byte-for-byte/AST-identical output to the sequential
+path — a pure performance toggle, not a behavior change — but targets that
+don't want threads (e.g. plain `wasm32-unknown-unknown` embeds) should
+disable just those two by re-enabling everything else explicitly:
+
+```toml
+marco-core = { version = "1.3", default-features = false, features = [
+    "intelligence-highlights", "intelligence-diagnostics", "intelligence-completions",
+    "intelligence-hover", "render-syntax-highlighting", "render-math",
+    "render-diagrams", "file-logger",
+] }
+```
+
+Call `warm_render_thread_pool(&["rust", "python"])` at application startup
+to pre-pay `parallel-render`'s one-time thread-pool and syntax-highlighter
+warm-up cost (a no-op when the feature isn't compiled in).
 
 ## Minimum Supported Rust Version
 

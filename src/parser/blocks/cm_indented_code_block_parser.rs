@@ -19,7 +19,11 @@ use crate::parser::ast::{Node, NodeKind};
 /// as indented code blocks are defined by their indentation.
 ///
 /// # Example
-/// ```ignore
+/// ```
+/// use marco_core::parser::blocks::cm_indented_code_block_parser::parse_indented_code_block;
+/// use marco_core::parser::shared::GrammarSpan;
+/// use marco_core::NodeKind;
+///
 /// let content = GrammarSpan::new("    code line 1\n    code line 2");
 /// let node = parse_indented_code_block(content);
 /// assert!(matches!(node.kind, NodeKind::CodeBlock { language: None, .. }));

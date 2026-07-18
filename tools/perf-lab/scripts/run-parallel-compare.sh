@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
-# run-parallel-compare.sh — compare marco-core's opt-in `parallel-render` +
-# `parallel-parse` features on vs off.
+# run-parallel-compare.sh — compare marco-core's `parallel-render` +
+# `parallel-parse` features on vs off. Both are on by default, so this
+# script builds one binary with them explicitly disabled
+# (`--no-default-features` + every other default feature re-enabled) and
+# one with the crate's plain defaults, so "off" and "on" mean what they say.
 #
 # Cargo features are compile-time and global to a build, so a single
 # perf-lab binary cannot toggle parallelism at runtime (see
@@ -74,13 +77,18 @@ BIN_DIR="tools/perf-lab/target/${PROFILE}"
 SEQ_BIN="${BIN_DIR}/perf-lab-sequential"
 PAR_BIN="${BIN_DIR}/perf-lab-parallel"
 
+# parallel-render/parallel-parse are on by default, so "sequential" needs
+# an explicit opt-out: disable all default features and re-enable every
+# one of them except the two parallel flags.
+SEQ_FEATURES="marco-core/intelligence-highlights,marco-core/intelligence-diagnostics,marco-core/intelligence-completions,marco-core/intelligence-hover,marco-core/render-syntax-highlighting,marco-core/render-math,marco-core/render-diagrams,marco-core/file-logger"
+
 echo "==> building sequential (parallel-render / parallel-parse off)"
-cargo build --manifest-path tools/perf-lab/Cargo.toml $RELEASE_FLAG 2>&1 | tail -2
+cargo build --manifest-path tools/perf-lab/Cargo.toml $RELEASE_FLAG \
+  --no-default-features --features "$SEQ_FEATURES" 2>&1 | tail -2
 cp "${BIN_DIR}/perf-lab" "$SEQ_BIN"
 
-echo "==> building parallel (parallel-render + parallel-parse on)"
-cargo build --manifest-path tools/perf-lab/Cargo.toml $RELEASE_FLAG \
-  --features marco-core/parallel-render,marco-core/parallel-parse 2>&1 | tail -2
+echo "==> building parallel (parallel-render + parallel-parse on, the crate default)"
+cargo build --manifest-path tools/perf-lab/Cargo.toml $RELEASE_FLAG 2>&1 | tail -2
 cp "${BIN_DIR}/perf-lab" "$PAR_BIN"
 
 extract_json() {

@@ -271,10 +271,10 @@ pub(super) fn resolve_emphasis(mut items: Vec<Item>) -> Vec<Node> {
                     || (arena[ci].can_open && arena[ci].can_close);
                 let compatible = if either_both {
                     let sum_mod3_zero =
-                        (arena[oi].original_count + arena[ci].original_count) % 3 == 0;
-                    let both_mod3_zero =
-                        arena[oi].original_count % 3 == 0 && arena[ci].original_count % 3 == 0;
-                    !(sum_mod3_zero && !both_mod3_zero)
+                        (arena[oi].original_count + arena[ci].original_count).is_multiple_of(3);
+                    let both_mod3_zero = arena[oi].original_count.is_multiple_of(3)
+                        && arena[ci].original_count.is_multiple_of(3);
+                    !sum_mod3_zero || both_mod3_zero
                 } else {
                     true
                 };
@@ -436,10 +436,9 @@ fn unlink(arena: &mut [StackEntry], i: usize) {
 /// 3-length run on both sides — the exact shape the old dedicated
 /// "```***text***```" grammar used to special-case as one flat node.
 fn is_pure_triple_pair(node: &Node, outer_is_strong: bool) -> bool {
-    let inner_is_strong_or_emphasis = match node.kind {
+    match node.kind {
         NodeKind::Strong => !outer_is_strong,
         NodeKind::Emphasis => outer_is_strong,
         _ => false,
-    };
-    inner_is_strong_or_emphasis
+    }
 }

@@ -21,7 +21,11 @@ use crate::parser::ast::{Node, NodeKind};
 /// the full line span.
 ///
 /// # Example
-/// ```ignore
+/// ```
+/// use marco_core::parser::blocks::cm_heading_parser::parse_atx_heading;
+/// use marco_core::parser::shared::GrammarSpan;
+/// use marco_core::NodeKind;
+///
 /// let content = GrammarSpan::new("Hello World");
 /// let node = parse_atx_heading(1, content);
 /// assert!(matches!(node.kind, NodeKind::Heading { level: 1, .. }));
@@ -47,9 +51,15 @@ pub fn parse_atx_heading(level: u8, content: GrammarSpan) -> Node {
 /// A Node with NodeKind::Heading
 ///
 /// # Example
-/// ```ignore
-/// let content = GrammarSpan::new("Hello\n===");
-/// let node = parse_setext_heading(1, content);
+/// ```
+/// use marco_core::grammar::setext_heading;
+/// use marco_core::parser::blocks::cm_heading_parser::parse_setext_heading;
+/// use marco_core::parser::shared::GrammarSpan;
+/// use marco_core::NodeKind;
+///
+/// let start = GrammarSpan::new("Hello\n===\n");
+/// let (rest, (level, content)) = setext_heading(start).unwrap();
+/// let node = parse_setext_heading(level, content, start, rest);
 /// assert!(matches!(node.kind, NodeKind::Heading { level: 1, .. }));
 /// ```
 pub fn parse_setext_heading(

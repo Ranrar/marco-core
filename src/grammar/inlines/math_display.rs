@@ -18,9 +18,13 @@ use nom::{
 /// The LaTeX content span (without the `$$` delimiters).
 ///
 /// # Example
-/// ```ignore
+/// ```
+/// use marco_core::grammar::{display_math, Span};
+///
 /// let input = Span::new("$$\\int_0^\\infty e^{-x^2} dx = \\sqrt{\\pi}$$ text");
 /// let (rest, content) = display_math(input).unwrap();
+/// assert_eq!(*content.fragment(), "\\int_0^\\infty e^{-x^2} dx = \\sqrt{\\pi}");
+/// assert_eq!(*rest.fragment(), " text");
 /// ```
 pub fn display_math(input: Span) -> IResult<Span, Span> {
     log::debug!("Parsing display math at: {:?}", input.fragment());

@@ -17,10 +17,14 @@ use crate::parser::ast::Document;
 /// * `title` - Optional title text
 ///
 /// # Example
-/// ```ignore
+/// ```
+/// use marco_core::parser::blocks::cm_link_reference_parser::parse_link_reference;
+/// use marco_core::Document;
+///
 /// let mut doc = Document::new();
-/// parse_link_reference(&mut doc, "foo", "https://example.com", Some("Example"));
+/// parse_link_reference(&mut doc, "foo", "https://example.com".to_string(), Some("Example".to_string()));
 /// // Reference is now stored and can be resolved by [foo] links
+/// assert!(doc.references.get("foo").is_some());
 /// ```
 pub fn parse_link_reference(
     document: &mut Document,
