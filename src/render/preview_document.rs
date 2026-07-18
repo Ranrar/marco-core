@@ -275,6 +275,11 @@ a[href^='mailto:']:not(.marco-heading-anchor):active {
                 var sliderResizeObservers = Object.create(null);
                 var sliderMeasureScheduled = Object.create(null);
                 var sliderWindowResizeInstalled = false;
+                // Fallback interval for decks opened with plain `@slidestart`
+                // (no `:tN` suffix): the play button still works and uses this
+                // rate, but autoplay does not start on its own on load — only
+                // an explicit `:tN` autoplays automatically.
+                var DEFAULT_SLIDER_TIMER_SECONDS = 5;
                 
                 // Cleanup function to clear any pending timeouts
                 function cleanupScrollRestoration() {{
@@ -544,28 +549,27 @@ a[href^='mailto:']:not(.marco-heading-anchor):active {
 
                 function initSliderDeck(deck) {{
                     if (!deck || !deck.id) return;
-                    var timerSeconds = parsePositiveInt(deck.getAttribute('data-timer-seconds'));
+                    // `explicitTimerSeconds` is what the author wrote as
+                    // `@slidestart:tN` — it's what decides whether the deck
+                    // autoplays on load. The play button itself should always
+                    // work though, so the *stored* timer falls back to the
+                    // standard rate when the author didn't request autoplay.
+                    var explicitTimerSeconds = parsePositiveInt(deck.getAttribute('data-timer-seconds'));
                     var slides = deck.querySelectorAll('.marco-sliders__slide');
                     if (!slides || slides.length === 0) return;
 
                     sliderDeckState[deck.id] = {{
                         deckEl: deck,
                         index: 0,
-                        timerSeconds: timerSeconds,
+                        timerSeconds: explicitTimerSeconds || DEFAULT_SLIDER_TIMER_SECONDS,
                         intervalId: null,
                         playing: false
                     }};
 
-                    // Disable toggle button if no timer.
                     var toggleBtn = deck.querySelector('.marco-sliders__btn--toggle');
                     if (toggleBtn) {{
-                        if (!timerSeconds) {{
-                            toggleBtn.disabled = true;
-                            toggleBtn.setAttribute('aria-disabled', 'true');
-                        }} else {{
-                            toggleBtn.disabled = false;
-                            toggleBtn.removeAttribute('aria-disabled');
-                        }}
+                        toggleBtn.disabled = false;
+                        toggleBtn.removeAttribute('aria-disabled');
                     }}
 
                     showSlide(deck, 0);
@@ -577,8 +581,11 @@ a[href^='mailto:']:not(.marco-heading-anchor):active {
                     installDeckResizeObserver(deck);
                     scheduleDeckMeasure(deck);
 
-                    // Autoplay if timer is present.
-                    if (timerSeconds) {{
+                    // Autoplay on load only when the author explicitly asked
+                    // for it via `:tN` — decks without a timer start paused,
+                    // but the play button is still enabled (using the
+                    // standard rate above) so the user can start it manually.
+                    if (explicitTimerSeconds) {{
                         slidersPlayDeck(deck.id);
                     }}
                 }}
@@ -1688,5 +1695,17 @@ mod tests {
             !doc.contains("pages per row"),
             "single-column should not have multi-column override"
         );
+    }
+
+    #[test]
+    fn smoke_slider_toggle_button_is_never_disabled() {
+        // Decks opened with plain `@slidestart` (no `:tN`) still get a
+        // working play button, using the standard fallback rate — the
+        // toggle button must no longer be unconditionally disabled when
+        // there's no explicit timer.
+        let doc = wrap_preview_html_document("<p>Test</p>", "", "light", None);
+        assert!(doc.contains("DEFAULT_SLIDER_TIMER_SECONDS"));
+        assert!(!doc.contains("Disable toggle button if no timer"));
+        assert!(doc.contains("toggleBtn.disabled = false;"));
     }
 }
