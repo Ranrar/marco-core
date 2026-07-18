@@ -74,7 +74,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
-            build-essential pkg-config libfontconfig-dev
+            build-essential pkg-config
 
       - name: Build perf-lab (release)
         run: cargo build --manifest-path tools/perf-lab/Cargo.toml --release
@@ -161,7 +161,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
-            build-essential pkg-config libfontconfig-dev
+            build-essential pkg-config
 
       - name: Build perf-lab (release)
         run: cargo build --manifest-path tools/perf-lab/Cargo.toml --release

@@ -18,7 +18,7 @@ You may be looking for:
 
 ```toml
 [dependencies]
-marco-core = "1.2"
+marco-core = "1.3"
 ```
 
 ```rust
@@ -92,10 +92,10 @@ let completions = provider.completions(""); // context-aware suggestions
 - TOC extraction (`extract_toc`), Markdown generation (`generate_toc_markdown`), and source insertion (`replace_toc_in_text`)
 
 **Reliability**
-- CommonMark spec conformance: 285/652 strict, 98.8% structural compliance
+- CommonMark spec conformance: 357/652 strict, 98.8% structural compliance
 - UTF-8 sanitization (`&[u8]` → `String`) strips null bytes and invalid sequences before parsing
 - GFM task list checkboxes and admonitions render as SVG icons (no CSS-only dependency)
-- 662 tests — 649 integration, 13 doc/unit — all green
+- 625 tests — 612 integration, 13 doc/unit — all green (plus 9 more under `--features parallel-parse`)
 
 ## When to use marco-core
 
@@ -113,18 +113,25 @@ Release build, 50-iteration mean:
 
 | Input size | Parse | Render | End-to-end |
 |---|---|---|---|
-| ~1 KB | 5.0 µs | 1.2 µs | 6.2 µs |
-| ~10 KB | 91.5 µs | 8.3 µs | 99.8 µs |
-| ~100 KB | 2.1 ms | 86 µs | 2.2 ms |
+| ~1 KB | 59 µs | 16 µs | 75 µs |
+| ~10 KB | 643 µs | 156 µs | 799 µs |
+| ~100 KB | 7.7 ms | 1.5 ms | 9.2 ms |
 
-Suitable for interactive editors and real-time linting.
+Suitable for interactive editors and real-time linting. On adversarial/pathological
+input (deeply nested emphasis, unbalanced brackets) marco-core previously fell off
+an algorithmic cliff (up to ~200x slower than comparable engines); as of this
+release it stays within a small constant factor even on those inputs — see
+[`PERFORMANCE_OPTIMIZATION_REVIEW.md`](PERFORMANCE_OPTIMIZATION_REVIEW.md) for
+the full cross-engine comparison and methodology. Opt-in `parallel-render` and
+`parallel-parse` features (off by default) add further multi-core speedups for
+code-block-heavy and flat/wide documents — see [Feature flags](#feature-flags).
 
 ## Feature flags
 
-All 8 flags are on by default. Use `default-features = false` to slim the build:
+8 flags are on by default. Use `default-features = false` to slim the build:
 
 ```toml
-marco-core = { version = "1.1", default-features = false, features = ["render-syntax-highlighting"] }
+marco-core = { version = "1.3", default-features = false, features = ["render-syntax-highlighting"] }
 ```
 
 | Flag | Enables |
@@ -139,6 +146,20 @@ marco-core = { version = "1.1", default-features = false, features = ["render-sy
 | `intelligence-hover` | Hover information |
 
 A `--no-default-features` build still includes parse + basic render.
+
+Two further flags are **off by default** (opt-in only, not part of the 8 above)
+— both pull in `rayon` for a real OS thread pool, so they're excluded from
+`default` for WASM/embedded targets that don't want threads:
+
+| Flag | Enables |
+|---|---|
+| `parallel-render` | Fan out per-code-block syntax highlighting across cores at render time |
+| `parallel-parse` | Fan out inline parsing of independent top-level blocks (paragraphs, table cells, definition terms, footnote bodies) across cores |
+
+Both produce byte-for-byte/AST-identical output to the sequential path —
+purely a performance opt-in. Call `warm_render_thread_pool(&["rust", "python"])`
+at application startup to pre-pay `parallel-render`'s one-time thread-pool and
+syntax-highlighter warm-up cost (a no-op when the feature isn't compiled in).
 
 ## Minimum Supported Rust Version
 

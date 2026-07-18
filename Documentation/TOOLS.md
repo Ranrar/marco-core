@@ -8,7 +8,10 @@ Developer tooling for `marco-core`. None are published to crates.io.
 # AST inspection
 cargo run --manifest-path tools/marco-ast/Cargo.toml -- --text "# Title" --mode ast
 
-# Benchmark (release recommended for fair results)
+# Quick local benchmark, no extra tooling — see "Root-level cargo bench" below
+cargo bench
+
+# Full benchmark (release recommended for fair results)
 ./tools/perf-lab/scripts/run-bench.sh --release --mode e2e --iterations 30
 
 # Cross-engine comparison
@@ -22,6 +25,29 @@ cargo run --manifest-path tools/marco-ast/Cargo.toml -- --text "# Title" --mode 
   --baseline tools/perf-lab/output/baseline/bench-baseline.json \
   --current  tools/perf-lab/output/summary/bench-<timestamp>.json
 ```
+
+## Root-level `cargo bench`
+
+`benches/core_benchmarks.rs` (`[[bench]] name = "core_benchmarks"` in the
+root `Cargo.toml`) is a small Criterion suite for quick local feedback —
+`cargo bench` works directly on the crate, no separate tool invocation
+needed. It benchmarks `marco_core::parse`/`render` in `parse`/`render`/`e2e`
+groups against `small`/`medium`/`large` plus the two headline pathological
+fixtures (`star-pyramid`, `unbalanced-brackets`), reusing the exact same
+files under `tools/perf-lab/fixtures/` via `include_str!` rather than
+duplicating content. Results land in `target/criterion/` (gitignored,
+standard Criterion HTML reports).
+
+```bash
+cargo bench                          # all groups
+cargo bench --bench core_benchmarks -- parse/small   # filter by name
+```
+
+This is deliberately minimal and is **not** the source of truth for this
+project's performance tracking — it has no cross-engine comparison, no full
+spec-suite corpus, no stress mode, and no CI regression gate. For all of
+that, use `tools/perf-lab` (below), which is what `ci-perf.yml` and
+`.dev/parser-render-optimization-plan.md`'s numbers are built on.
 
 ## marco-ast
 
@@ -168,7 +194,34 @@ All scripts accept `--release` as the first argument.
 ./tools/perf-lab/scripts/run-compare.sh [--release] [compare options]
 ./tools/perf-lab/scripts/run-hyperfine.sh [--release] [options]
 ./tools/perf-lab/scripts/run-regression.sh [--release] [regression options]
+./tools/perf-lab/scripts/run-parallel-compare.sh [--release] [bench options] [-- regression options]
 ```
+
+**`run-parallel-compare.sh`** — `parallel-render`/`parallel-parse` are
+compile-time Cargo features, so no single perf-lab binary can toggle them
+per-run (`bench` has no `--features` flag). This script builds perf-lab
+twice — once with both features off, once with `--features
+marco-core/parallel-render,marco-core/parallel-parse` — runs the same
+`bench` invocation against each binary, and feeds the two `BenchRecord`
+artifacts into `regression` as the diff engine, which already matches
+records by `(engine, workload_id, mode)` and prints a %-change table (no new
+report format needed). By default the gate thresholds are set high enough
+that it never fails/warns — it's a report, not a CI gate, since most
+workloads are expected to be ~unchanged (`parallel-parse` only defers
+`depth == 0` top-level content; `parallel-render` only helps
+code-block-heavy documents) and a tight threshold would flag ordinary noise.
+Pass your own thresholds after `--` to opt into gating:
+
+```bash
+./tools/perf-lab/scripts/run-parallel-compare.sh --release --mode e2e --iterations 20
+./tools/perf-lab/scripts/run-parallel-compare.sh --release --mode parse --iterations 20 \
+  --workload fixture:large:paragraph-heavy.md
+./tools/perf-lab/scripts/run-parallel-compare.sh --release --mode e2e --iterations 20 \
+  -- --warn-threshold 15 --fail-threshold 30 --min-failures 1
+```
+
+Labeled artifacts (`parallel-compare-<timestamp>-{sequential,parallel}.json`)
+are kept under `output/summary/` for reproducibility.
 
 **`run-hyperfine.sh`** requires `hyperfine >= 1.18`:
 ```bash
@@ -200,6 +253,9 @@ cp $(ls -1t tools/perf-lab/output/summary/bench-*.json | head -1) \
 # marco-ast
 cargo build --manifest-path tools/marco-ast/Cargo.toml
 cargo test  --manifest-path tools/marco-ast/Cargo.toml
+
+# root-level cargo bench (see "Root-level cargo bench" above)
+cargo bench
 
 # perf-lab
 cargo build --manifest-path tools/perf-lab/Cargo.toml --release

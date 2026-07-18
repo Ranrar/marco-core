@@ -38,7 +38,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            build-essential pkg-config libfontconfig-dev
+            build-essential pkg-config
 
       - name: Show crate version
         run: |

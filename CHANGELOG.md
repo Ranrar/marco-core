@@ -5,6 +5,114 @@ This project follows **Semantic Versioning** and uses the **Keep a Changelog** f
 
 Version scheme note: `marco-core` and `marco-shared` follow independent semver from the application binaries (marco/polo). The library tracks API stability for crates.io consumers; breaking API changes increment the major version.
 
+## [1.3.0] - 2026-07-17
+
+### Fixed
+
+#### Catastrophic slowdown on pathological/adversarial Markdown
+
+Inline parsing previously fell off an algorithmic cliff on certain input
+shapes — most severely on documents with many unmatched `[`/`]` brackets
+(e.g. `[[[[[unbalanced]`), which triggered exponential-in-nesting-depth
+speculative re-parsing and could take **hundreds of milliseconds** for a
+13 KB file. Deeply nested emphasis delimiter runs (`*a**b***c...`) hit a
+related, less severe quadratic blowup. On the full CommonMark spec suite
+this showed up as marco-core running **~211x slower than pulldown-cmark**
+and **~209x slower than comrak**; on the isolated bracket-heavy case, up to
+**~1061x/574x** slower.
+
+Two root causes, both fixed:
+- Emphasis/strong resolution now implements the CommonMark delimiter-stack
+  algorithm (spec Appendix A) instead of a naive per-position rescan. As a
+  side effect, strict CommonMark spec conformance rose from 285/652 (43.7%)
+  to 357/652 (54.8%), with zero regressions elsewhere (structural
+  conformance unchanged at 644/652; both extension spec suites still 100%).
+- Link/image bracket matching is now precomputed in a single linear pass
+  instead of rescanned per attempt, and reference-link parsing no longer
+  eagerly re-parses speculative link text before validating the surrounding
+  construct is even a valid link.
+
+Net effect: the full spec suite now runs within **~2.4x/2.3x** of
+pulldown-cmark/comrak (down from ~211x/209x), and the bracket-heavy
+pathological case is within **~4.3x/2.4x** (down from ~1061x/574x). Normal,
+non-adversarial documents are unaffected — this was never a normal-case
+regression, only a worst-case one.
+
+Also fixed as part of this work: `NodeKind::StrongEmphasis` (`***text***`)
+rendered with the wrong tag order (`<strong><em>` instead of the
+spec-correct `<em><strong>`); and an unbounded per-plain-text-chunk
+lookahead scan (for autolinks, emoji shortcodes, and platform mentions)
+that re-scanned the entire remaining document on every chunk instead of
+being bounded to the current line, an `O(n²)` cost on any multi-line
+paragraph with no matches.
+
+### Added
+
+#### Opt-in multi-core parallelism (`parallel-render`, `parallel-parse`)
+
+Two new Cargo features, both **off by default** (they pull in `rayon`, a
+real OS thread pool, so they're excluded from targets that don't want
+threads — e.g. plain `wasm32-unknown-unknown`):
+
+- `parallel-render` fans out per-code-block syntax highlighting across
+  cores at render time. On a 16-core machine, a code-block-heavy document
+  (80 fenced blocks) rendered **~6.9x faster** with the feature enabled.
+- `parallel-parse` fans out inline parsing of independent top-level blocks
+  (paragraphs, table cells, definition terms, footnote-definition bodies)
+  across cores at parse time. On a flat, paragraph-heavy document (400
+  top-level paragraphs), parsing was **~1.95x faster**. Content nested
+  inside a list item, blockquote, or slide/tab panel is deliberately left
+  on the sequential path — depth-gated after benchmarking showed
+  parallelizing it naively regressed list-heavy documents by ~28%.
+
+Both produce byte-for-byte HTML / AST-identical output to the sequential
+path — this is purely a performance opt-in, not a behavior change. Also
+added: `warm_render_thread_pool(languages: &[&str])`, re-exported at the
+crate root, lets an embedder pre-pay `parallel-render`'s one-time
+thread-pool and per-language syntax-highlighter warm-up cost at a time of
+its choosing (e.g. application startup) instead of on the first render. A
+no-op when `parallel-render` isn't compiled in, so call sites don't need
+their own `#[cfg]`.
+
+#### Root-level `cargo bench`
+
+`benches/core_benchmarks.rs` adds a small Criterion suite so `cargo bench`
+works directly on the crate without a separate tool invocation — parse/
+render/e2e timings against representative small/medium/large fixtures plus
+the two pathological cases above. `tools/perf-lab` remains the source of
+truth for cross-engine comparison, the full spec-suite corpus, stress
+testing, and CI regression gating; this is just quick local feedback.
+
+### Changed
+
+#### CI performance regression gate now actually gates
+
+`.github/workflows/ci-perf.yml`'s regression gate had two bugs that meant
+it could never fail a PR, regardless of actual performance: its two
+benchmark stages (`e2e` and `parse` mode) each overwrote the same "latest
+artifact" file, so the parse-mode run's output silently discarded the
+e2e run's, and the comparison against baseline then matched zero records
+(mode mismatch) — "regression gate passed" was printed unconditionally.
+Both fixed (both modes are now merged into one artifact before comparing).
+The gate also gained a dedicated critical-workload check —
+`spec:commonmark` and `fixture:pathological:*` now fail a PR on their own
+past a 20% parse-time regression, rather than needing a second, unrelated
+workload to also regress before the broad gate trips.
+
+#### Dependency update and cleanup
+
+Routine patch/minor bumps: `ron`, `log`, `chrono`, `serial_test` (dev).
+Breaking bumps, internal-only (no marco-core public API exposes these
+crates' types, so consumers are unaffected regardless): `emojis` 0.8→0.9,
+`mermaid-rs-renderer` 0.2→0.3, `criterion` 0.5→0.8 (dev-only; 0.6 dropped
+`criterion::black_box` for `std::hint::black_box`, updated accordingly).
+
+Removed two dependencies confirmed unused anywhere in the repo: `fontconfig`
+(Linux-only; was never called from `src/`, and CI no longer installs
+`libfontconfig-dev` as a result) and `tempfile`. Moved `serde_json` from
+`[dependencies]` to `[dev-dependencies]` — only the test suite used it,
+not the library.
+
 ## [1.2.0] - 2026-07-08
 
 ### Added
